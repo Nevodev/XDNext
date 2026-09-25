@@ -1,5 +1,6 @@
 package com.nevoit.xdnext.di
 
+import com.nevoit.material.theme.systemIsDarkTheme
 import com.nevoit.material.theme.systemSeedColor
 import com.nevoit.xdnext.core.crypto.AesCbc
 import com.nevoit.xdnext.core.platform.supportDirectoryPath
@@ -23,6 +24,7 @@ import com.nevoit.xdnext.data.session.SliderCaptchaBroker
 import com.nevoit.xdnext.data.timetable.TimetableRepository
 import com.nevoit.xdnext.ui.StartupPalettes
 import com.nevoit.xdnext.ui.login.LoginViewModel
+import com.nevoit.xdnext.ui.timetable.ClassPaletteCache
 import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path.Companion.toPath
@@ -52,10 +54,27 @@ val sharedModule = module {
     single { AesCbc() }
     single { IdsCrypto(get()) }
 
-    // Resolved by the start-up warm-up on a worker and by the composition before it draws anything, so
-    // that the container's lock hands the *real* palettes over rather than letting the first frame build
-    // them a second time. See `StartupPalettes`.
-    single { StartupPalettes() }
+    // The palettes are built *in this constructor*, on whichever thread resolves it first, so that the
+    // composition's resolution is a hand-off: the start-up warm-up builds it on a worker and the first
+    // frame waits there for the real thing rather than building its own. See `StartupPalettes`.
+    single {
+        StartupPalettes(
+            seed = systemSeedColor(),
+            isDarkTheme = systemIsDarkTheme(),
+            cache = get(),
+        )
+    }
+
+    // The course colours are the expensive half of that and a pure function of the accent, so they are
+    // kept between launches. Beside the cookie store and the other caches, under the app's own support
+    // directory — see `ClassPaletteCache`.
+    single {
+        ClassPaletteCache(
+            fileSystem = FileSystem.SYSTEM,
+            path = supportDirectoryPath().toPath() / "ClassPalette.json",
+            json = get(),
+        )
+    }
 
     single { SettingsStore(get()) }
     single { CredentialStore(get(), get(), get()) }
@@ -116,13 +135,12 @@ val sharedModule = module {
     single {
         AppWarmUp(
             listOf(
-                // First, because the first frame cannot be drawn without them: the theme's palette is what
-                // `MaterialTheme` paints with and the course palette is what the timetable's grid draws
-                // with. Building them here — with the platform's own seed, on a worker — is what keeps that
-                // cost out of the frame, which then only waits for this step rather than repeating it.
-                // Measured at roughly 50 ms for the theme palette and 60 ms for the course one in a debug
-                // build; see `StartupPalettes`.
-                AppWarmUp.Step("palettes") { get<StartupPalettes>().prepare(systemSeedColor()) },
+                // First, because the first frame cannot be drawn without them: `MaterialTheme` paints with
+                // the theme palette and the campus page draws courses in the course colours. Building them
+                // here — with the platform's own seed and mode, on a worker — is what keeps that work off
+                // the frame, which waits for this step instead of repeating it. About 40 ms plus 180 ms in
+                // a debug build; see `StartupPalettes`.
+                AppWarmUp.Step("palettes") { get<StartupPalettes>() },
                 AppWarmUp.Step("timetable cache") { get<TimetableRepository>() },
                 AppWarmUp.Step("energy cache") { get<EnergyRepository>() },
                 AppWarmUp.Step("campus card cache") { get<SchoolCardRepository>() },

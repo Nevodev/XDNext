@@ -12,8 +12,6 @@ import com.nevoit.material.theme.MaterialTheme
 import com.nevoit.material.theme.ThemeMode
 import com.nevoit.material.theme.rememberSystemSeedColor
 import com.nevoit.material.theme.resolveDarkTheme
-import com.nevoit.xdnext.core.log.appLog
-import com.nevoit.xdnext.core.startup.StartupClock
 import com.nevoit.xdnext.ui.AppNavHost
 import com.nevoit.xdnext.ui.StartupPalettes
 import com.nevoit.xdnext.ui.login.LoginInteractions
@@ -25,14 +23,7 @@ import org.koin.compose.koinInject
 
 @Composable
 fun App() {
-    val composedAt = remember { StartupClock.elapsedMs() }
-
-    // Resolved before anything is drawn, and that is the point: the start-up warm-up is building the real
-    // palettes from the platform's own seed on a worker, so if it has not finished, this waits for *that*
-    // construction on the container's lock instead of building a second copy on the frame. See
-    // `StartupPalettes` for what it costs and why it is worth waiting for.
     val palettes: StartupPalettes = koinInject()
-    val palettesReadyAt = remember { StartupClock.elapsedMs() }
     val seedColor = rememberSystemSeedColor()
     val darkTheme = resolveDarkTheme(ThemeMode.SYSTEM)
 
@@ -43,33 +34,26 @@ fun App() {
             palettes.themeColors(seedColor, darkTheme)
         },
     ) {
-        val themeReadyAt = remember { StartupClock.elapsedMs() }
-        val coursePalette = remember(seedColor) { palettes.courseColors(seedColor) }
-        val courseReadyAt = remember { StartupClock.elapsedMs() }
-        LaunchedEffect(Unit) {
-            val frameAt = StartupClock.elapsedMs()
-            appLog.i {
-                // Four numbers, because they mean different things and only two of them are this frame's
-                // own work. `waited` is time spent on the warm-up's worker — the palettes it prepares are
-                // used if they are ready by now and built here if they are not, so a worker that is still
-                // busy costs nothing but also buys nothing. `theme` and `course` are what this frame
-                // really spent; `first frame` is where the composition ended, which includes everything
-                // else the shell does.
-                "[Startup] palettes waited ${palettesReadyAt - composedAt}ms, theme " +
-                        "${themeReadyAt - palettesReadyAt}ms, course ${courseReadyAt - themeReadyAt}ms, " +
-                        "first frame at ${frameAt}ms (${frameAt - composedAt}ms of composition)"
-            }
-        }
-
-        ProvideClassPalette(palette = coursePalette) {
+        ProvideClassPalette(palette = remember(seedColor) { palettes.courseColors(seedColor) }) {
             ProvideMaterialSymbols {
                 val login: LoginViewModel = koinInject()
+                // Once, on the first composition: the stored account goes back into the form, and a device
+                // that has logged in before restores its session behind the shell.
                 LaunchedEffect(login) { login.start() }
+
+                // Which screen this is was decided before anything was drawn. `loggedIn` is seeded in the
+                // view model's constructor from a preference read, not from a request, so a warm start
+                // composes the shell straight away — no frame shows the login screen and then navigates
+                // off it, which is a flash, not navigation. The two sides are not pages of the navigator
+                // and no transition is played between them: signing in or out swaps the composition, which
+                // is also why back cannot return to a form that has been answered.
                 val loggedIn by login.loggedIn.collectAsState()
 
                 if (loggedIn) {
                     AppNavHost()
                 } else {
+                    // The shell paints the page background in its own `Surface`; the login screen is the
+                    // whole composition when it is showing, so it has to bring its own.
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colors.pageBackground,
@@ -79,6 +63,8 @@ fun App() {
                     }
                 }
 
+                // Above both, because a background refresh can raise a slider captcha or a second factor
+                // long after the login screen is gone.
                 LoginInteractions(login)
             }
         }

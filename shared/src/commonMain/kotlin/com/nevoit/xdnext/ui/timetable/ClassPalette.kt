@@ -77,11 +77,41 @@ data class ClassSwatch(
     val onPrimaryContainer: Color,
 )
 
+/**
+ * The sixteen course colours, in both themes, for one seed.
+ *
+ * **Each theme is generated when it is first asked for, not when the palette is made.** Sixteen seeds in
+ * two themes is thirty-two schemes, which measured about 180 ms of interpreted colour maths on a device —
+ * and only one of the two themes is ever on screen at a time. The start-up warm-up therefore builds the
+ * mode the app is about to draw (see `StartupPalettes`) and the other one is built only if the mode
+ * changes, which is something a user does once in a while rather than on every launch.
+ *
+ * Equality is by seed, because the seed is the entire input: two palettes generated from the same colour
+ * are the same palette, whether or not either has got round to generating its dark half yet.
+ */
 @Immutable
-data class ClassPalette(
-    val light: List<ClassSwatch>,
-    val dark: List<ClassSwatch>,
+class ClassPalette internal constructor(
+    private val themeSeed: Color,
+    cachedLight: List<ClassSwatch>? = null,
+    cachedDark: List<ClassSwatch>? = null,
 ) {
+
+    private val key = themeSeed.toArgb()
+
+    private val lightSwatches: List<ClassSwatch> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        cachedLight ?: Seeds.map { it.rolesFor(key, isDark = false) }
+    }
+
+    private val darkSwatches: List<ClassSwatch> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        cachedDark ?: Seeds.map { it.rolesFor(key, isDark = true) }
+    }
+
+    /** The sixteen swatches as they are drawn in the light theme. */
+    val light: List<ClassSwatch> get() = lightSwatches
+
+    /** The sixteen swatches as they are drawn in the dark theme. */
+    val dark: List<ClassSwatch> get() = darkSwatches
+
     fun swatches(isDark: Boolean): List<ClassSwatch> = if (isDark) dark else light
 
     fun swatchFor(index: Int, isDark: Boolean): ClassSwatch {
@@ -89,6 +119,13 @@ data class ClassPalette(
         val size = swatches.size
         return swatches[((index % size) + size) % size]
     }
+
+    override fun equals(other: Any?): Boolean =
+        other is ClassPalette && other.themeSeed == themeSeed
+
+    override fun hashCode(): Int = themeSeed.hashCode()
+
+    override fun toString(): String = "ClassPalette($themeSeed)"
 
     companion object {
         /**
@@ -115,18 +152,26 @@ data class ClassPalette(
         )
 
         /**
-         * Generates the whole palette from the theme's own seed colour — the system accent.
+         * The palette for [themeSeed] — the theme's own key colour.
          *
          * [themeSeed] is the *key* colour harmony pulls towards, not a colour any course is painted
          * with: each course keeps its own hue, chroma and tone, and only its hue is nudged.
          */
-        fun from(themeSeed: Color): ClassPalette {
-            val key = themeSeed.toArgb()
-            return ClassPalette(
-                light = Seeds.map { it.rolesFor(key, isDark = false) },
-                dark = Seeds.map { it.rolesFor(key, isDark = true) },
-            )
-        }
+        fun from(themeSeed: Color): ClassPalette = ClassPalette(themeSeed)
+
+        /**
+         * The palette for [themeSeed] from colours that were generated earlier and kept — see
+         * [ClassPaletteCache].
+         *
+         * Both themes are supplied, so nothing is generated. The seed is still carried, because it is what
+         * the palette *is* and what it compares by; a cached palette that was written for another seed
+         * never reaches here, which is the cache's own check to make.
+         */
+        fun of(
+            themeSeed: Color,
+            light: List<ClassSwatch>,
+            dark: List<ClassSwatch>,
+        ): ClassPalette = ClassPalette(themeSeed, cachedLight = light, cachedDark = dark)
 
         /** One seed's four roles, read out of its own harmonized scheme. */
         private fun Color.rolesFor(themeSeedArgb: Int, isDark: Boolean): ClassSwatch {
