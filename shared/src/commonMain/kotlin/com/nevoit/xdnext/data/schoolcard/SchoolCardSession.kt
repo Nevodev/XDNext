@@ -42,10 +42,26 @@ interface SchoolCardDataSource {
      * server fails. Throws only when there is no cached balance to fall back to.
      */
     suspend fun getSchoolCard(): FetchResult<SchoolCardSnapshot>
+
+    /**
+     * The rows cached for [range], or null when nothing has ever been cached for days that cover it.
+     *
+     * The page asks this before its query so it can draw a list on the first frame — off campus that is
+     * the only list there will ever be.
+     */
+    fun getCachedTransactions(range: SchoolCardRange): FetchResult<List<SchoolCardTransaction>>?
+
+    /**
+     * Fetches the flows of [range], falling back to [getCachedTransactions] when the query fails.
+     *
+     * Throws only when there is no cached answer that covers [range]: an empty list is a real answer —
+     * "you spent nothing in these days" — and a failure is not.
+     */
+    suspend fun getTransactions(range: SchoolCardRange): FetchResult<List<SchoolCardTransaction>>
 }
 
 /**
- * The campus card system's session: the OAuth hop, the balance, and the day's transactions.
+ * The campus card system's session: the OAuth hop, the balance, and the flow list.
  *
  * Ported from `lib/repository/ids_session/school_card_session.dart`. One part of that flow is unusual,
  * and it is why this is not four lines: **the session is entered through the OAuth landing page, not a
@@ -59,6 +75,13 @@ interface SchoolCardDataSource {
  *    that is the card session, and it is kept for [OPEN_ID_VALIDITY], as the original kept it;
  * 3. read the balance from `openMyAccount?openid=…`, which answers with HTML;
  * 4. read today's transactions from `queryCardSelfTradeList`, which answers with JSON.
+ *
+ * Step 4 serves two callers, and they are why this exposes two reads rather than one. The card
+ * ([getSchoolCard]) asks it for **today**, because that is what the tile's 今日支出 is. The card page
+ * ([getTransactions]) asks it for the **days the user picked**, which is the original's own range query —
+ * `[now.firstDayOfMonth, now]` when its page opened, and whatever the picker came back with afterwards.
+ * The request is the same shape in both cases; what differs is the window, and each caller keeps its own
+ * cache entry keyed by it.
  *
  * Using the card system's own OAuth entry point as the service — which is what the original did, and
  * what this port did until the live server was measured — makes IDS answer 200 with its
@@ -78,10 +101,58 @@ interface SchoolCardDataSource {
  * Internal because it takes an [SchoolCardApi], which speaks in wire rows. The rest of the app binds
  * [SchoolCardDataSource].
  */
+/**
+ * One pass at the card's two reads, either of which may have failed.
+ *
+ * The failures are carried rather than thrown so that [SchoolCardSession.requestSchoolCard] can decide
+ * between three outcomes instead of two: a complete card, half a card, or nothing at all. A `Result` is
+ * exactly that three-way answer — `success(null)` is a page that ran and carried no amount, which is not
+ * the same thing as a request that failed, and the retry needs to tell them apart.
+ */
+private class CardAttempt(
+    val balance: Result<String?>,
+    val trades: Result<List<SchoolCardRecord>>,
+) {
+
+    /** Both reads *ran*, whatever they found. A complete card is not retried. */
+    val isComplete: Boolean get() = balance.isSuccess && trades.isSuccess
+
+    /** Whether anything at all came back, which is what decides between half a card and a failure. */
+    val readAnything: Boolean get() = balance.getOrNull() != null || trades.getOrNull() != null
+
+    /** The first failure, in the order the requests were made. */
+    fun errorOrNull(): Throwable? = balance.exceptionOrNull() ?: trades.exceptionOrNull()
+
+    fun toSnapshot(today: LocalDate): SchoolCardSnapshot {
+        val snapshot = trades.getOrNull()?.let { summarise(it, today) }
+        return SchoolCardSnapshot(
+            balance = balance.getOrNull(),
+            // Null, not zero, when the query failed: the card must be able to say it does not know,
+            // because a zero under the heading 今日支出 is a claim about a day nobody read.
+            todayExpenseCents = snapshot?.todayExpenseCents,
+            todayIncomeCents = snapshot?.todayIncomeCents ?: 0,
+        )
+    }
+}
+
+/**
+ * Today's two figures, from today's rows — the same filtering and the same sums the card page's list
+ * uses, applied to one day instead of a chosen range.
+ */
+private fun summarise(records: List<SchoolCardRecord>, today: LocalDate): SchoolCardSnapshot {
+    val transactions = transactionsIn(records, SchoolCardRange(today, today))
+    return SchoolCardSnapshot(
+        balance = null,
+        todayExpenseCents = transactions.expenseCents(),
+        todayIncomeCents = transactions.incomeCents(),
+    )
+}
+
 internal class SchoolCardSession(
     private val ids: IdsSessionRepository,
     private val api: SchoolCardApi,
     private val cache: SchoolCardCache,
+    private val tradeListCache: SchoolCardTradeListCache,
     private val captcha: SliderCaptchaSolver = NoCaptchaSolver,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
@@ -93,6 +164,10 @@ internal class SchoolCardSession(
 
     override fun getCachedCard(today: LocalDate): FetchResult<SchoolCardSnapshot>? =
         cache.read(today)
+
+    override fun getCachedTransactions(
+        range: SchoolCardRange,
+    ): FetchResult<List<SchoolCardTransaction>>? = tradeListCache.read(range)
 
     /**
      * Reads the card, with the original's fallback: a failure never throws away a cached balance, it
@@ -126,35 +201,80 @@ internal class SchoolCardSession(
     }
 
     /**
-     * One attempt at the whole card, under a freshly checked handle.
+     * The rows of [range], with the same fallback the card itself has: a failure annotates the cached
+     * answer instead of throwing it away, and only a failure with nothing cached throws.
+     *
+     * The rows are filtered to [range] here rather than trusted from the server, through the same
+     * [transactionsIn] the day's totals go through: the query's two dates are the *server's* idea of the
+     * window, and a row it returns outside them — a boundary the two sides disagree about — would
+     * otherwise be drawn under a heading that named other days.
+     */
+    override suspend fun getTransactions(
+        range: SchoolCardRange,
+    ): FetchResult<List<SchoolCardTransaction>> {
+        val fetchTime = clock.now()
+        val cached = tradeListCache.read(range)
+
+        return try {
+            val rows = withOpenIdRetry { handle ->
+                api.queryTradeList(
+                    openId = handle,
+                    from = range.from.toCardQueryDate(),
+                    to = range.to.toCardQueryDate(),
+                )
+            }
+            val transactions = transactionsIn(rows, range)
+            tradeListCache.save(range, transactions)
+            FetchResult.fresh(fetchTime = fetchTime, data = transactions)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            appLog.w(error) { "[SchoolCardSession] Could not read the flows of $range" }
+            if (cached == null) throw error
+            FetchResult.cache(
+                fetchTime = cached.fetchTime,
+                data = cached.data,
+                hintKey = schoolCardCacheHintFor(error).key,
+            )
+        }
+    }
+
+    /**
+     * The whole card, read under a checked handle and retried once with a fresh one.
      *
      * The two reads are independent on purpose: a transaction query that fails still leaves a balance
-     * worth showing, and the original's own card page and home page each did only one of them. They
-     * are *run* independently but *reported* together, which is what makes [withOpenIdRetry] able to
-     * act on either: a failure swallowed here would be a retry that never happened.
+     * worth showing, and the original's own card page and home page each did only one of them. They are
+     * *run* independently and *reported* independently, which is what [SchoolCardSnapshot]'s two nullable
+     * fields are for — a balance with no day, or a day with no balance, is still half a card.
+     *
+     * The retry is the original's, kept because the failure it guards against is real: the handle outlives
+     * the cookie that makes it meaningful, and a request carrying a stale one is refused
+     * indistinguishably from a request that is simply wrong. It is triggered by *any* read failing, and
+     * that is what makes it cheap to keep half an answer: the second attempt is what is shown, and the
+     * first is used only when the second read even less.
      */
-    private suspend fun requestSchoolCard(): SchoolCardSnapshot = withOpenIdRetry { handle ->
+    private suspend fun requestSchoolCard(): SchoolCardSnapshot {
         val today = clock.now().toLocalDateTime(timeZone).date
-        val balance = balanceOrNull(handle)
-        val trades = tradeListOrNull(handle, today)
 
-        // A stale handle is the failure the retry exists for, and the two requests fail with different
-        // exception types; the first failure is the one reported, because the second is usually its
-        // consequence.
-        trades.exceptionOrNull()?.let { throw it }
-        balance.exceptionOrNull()?.let { throw it }
+        val first = attemptCard(today, force = false)
+        if (first.isComplete) return first.toSnapshot(today)
 
-        if (balance.getOrNull() == null && trades.getOrNull() == null) {
-            throw SchoolCardProtocolException("校园卡余额与流水均未取到")
+        val second = attemptCard(today, force = true)
+        val answered = if (second.readAnything) second else first
+        if (!answered.readAnything) {
+            // With nothing to show at all, the failure is reported rather than dressed up as a card — and
+            // the first failure is the one reported, because the second is usually its consequence.
+            throw answered.errorOrNull() ?: SchoolCardProtocolException("校园卡余额与流水均未取到")
         }
+        return answered.toSnapshot(today)
+    }
 
-        val snapshot = trades.getOrNull()?.let { summarise(it, today) }
-        SchoolCardSnapshot(
-            balance = balance.getOrNull(),
-            // Null, not zero, when the query failed: the tile must be able to say it does not know,
-            // because a zero under the heading 今日支出 is a claim about a day nobody read.
-            todayExpenseCents = snapshot?.todayExpenseCents,
-            todayIncomeCents = snapshot?.todayIncomeCents ?: 0,
+    /** One pass at both reads, under one handle. Either side may fail; neither is discarded here. */
+    private suspend fun attemptCard(today: LocalDate, force: Boolean): CardAttempt {
+        val handle = openId(force = force)
+        return CardAttempt(
+            balance = balanceOrNull(handle),
+            trades = tradeListOrNull(handle, today),
         )
     }
 
@@ -192,12 +312,6 @@ internal class SchoolCardSession(
         Result.failure(error)
     }
 
-    private fun summarise(records: List<SchoolCardRecord>, today: LocalDate) = SchoolCardSnapshot(
-        balance = null,
-        todayExpenseCents = todayExpenseCents(records, today),
-        todayIncomeCents = todayIncomeCents(records, today),
-    )
-
     /**
      * Runs [action] with the card's handle, and once more with a new one if it fails.
      *
@@ -216,7 +330,6 @@ internal class SchoolCardSession(
             action(openId(force = true))
         }
     }
-
     /**
      * The card handle, minted once and reused while it is fresh.
      *

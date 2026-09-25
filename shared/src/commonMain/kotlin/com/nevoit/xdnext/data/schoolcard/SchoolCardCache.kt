@@ -108,6 +108,9 @@ class SchoolCardCache(
  *
  * [balance] is nullable because a read that produced only transactions is still worth storing half of;
  * [knownDate] because a read that produced only a balance has no day to name.
+ *
+ * The day's *rows* are not stored here: the card page's list answers a range the user chooses, and it
+ * keeps its own file for exactly the range it was asked — see [SchoolCardTradeListCache].
  */
 @Serializable
 internal data class SchoolCardCacheSnapshot(

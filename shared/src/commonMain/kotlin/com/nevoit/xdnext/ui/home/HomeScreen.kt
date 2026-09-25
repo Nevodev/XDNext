@@ -46,6 +46,9 @@ internal val FloatingBarSpace = DefaultNavigationBarHeight + BarBottomMargin
 @Composable
 fun HomeScreen(
     onOpenTimetable: () -> Unit,
+    onOpenEnergy: () -> Unit,
+    onOpenWaterFee: () -> Unit,
+    onOpenSchoolCard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var tab by rememberSaveable { mutableStateOf(HomeTab.Focus) }
@@ -57,8 +60,13 @@ fun HomeScreen(
         CardRefresher(energy, schoolCard, timetable)
     }
 
-    val tileActions = remember(onOpenTimetable) {
-        TileActions(openTimetable = onOpenTimetable)
+    val tileActions = remember(onOpenTimetable, onOpenEnergy, onOpenWaterFee, onOpenSchoolCard) {
+        TileActions(
+            openTimetable = onOpenTimetable,
+            openEnergy = onOpenEnergy,
+            openWaterFee = onOpenWaterFee,
+            openSchoolCard = onOpenSchoolCard,
+        )
     }
 
     val colors = MaterialTheme.colors

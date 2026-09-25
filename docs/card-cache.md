@@ -23,12 +23,26 @@
 | 电量余额 | 不会，昨天读的余额今天还是余额 | 跨天仍然可用，照常显示 |
 | 校园卡余额 | 不会 | 同上 |
 | **今日**支出 | **会**，它描述的是某一天 | 只在与读取日相同的那天才用；换天即丢弃，显示为「—」/「余额未知」 |
+| 区间流水（校园卡页面） | 不会，但**只对问过的那段日期成立** | 存的时候连区间一起存；只有存下来的区间**包含**要问的区间才用 |
 
 所以 `SchoolCard.json` 里存了 `knownDate`：那是这组「今日」数字描述的那一天。读缓存时若
 `knownDate != today`，余额照给、当日金额一律置空——**绝不把昨天的数字贴到「今日支出」下面**。
 证据在 `SchoolCardCacheTest`：`dropsTheDaysTotalsOnceTheDayHasPassed`。
 
 金额一律用**整分 Long** 累加，不用 `Double`：`0.1 + 0.2 != 0.3`，一天的零星消费会把误差显出来。
+
+### 值可以是一段区间：`SchoolCardTradeList.json`
+
+页面要查的不是「这张卡的流水」，而是「**这几天**的流水」——问题里就带着区间，所以答案也必须带着它。
+`SchoolCardTradeListCache` 把区间和行一起写进 `SchoolCardTradeList.json`，读取时只在存下的区间
+**覆盖**（`covers`，含首含尾）要问的区间时才回答：
+
+- 存了整月 → 问今天是命中（今天的行本来就在里面），这正是缓存有用的地方；
+- 存了今天 → 问整月是 miss，因为那样答出来的列表会**悄悄少掉几天**，而屏幕上看起来和「这几天没有消费」
+  一模一样。宁可重查一次。
+
+区间流水**不**因为跨天而作废：这一天的行在当天下班之后仍然是这一天的行，文件里的区间就是它的说明。
+校验的是覆盖，不是新旧。
 
 ## 每张卡片必须有的三件东西
 
@@ -43,6 +57,7 @@
    - 只有一个不可变快照 `StateFlow`，一帧不可能由两次不同的抓取拼出来；
    - 失败时：**有缓存就不是 error**（缓存只在没有缓存时才置 `error`），并带上失败原因（`XxxCacheHint`）；
    - 刷新中保留屏幕上的旧值（`isLoading = true` 但不清空数据）。
+   - 如果这个页面查的是**用户选的区间/条件**，那它还要遵循两条额外的规矩，见下面「带参数的查询」。
 
 3. **`XxxTile`** —— 只负责画，**不负责抓**。
    - 大数字只放数值本身或 `—`，状态文案（「正在查询」「余额未知」「点击重试」）放小标题那一行；
@@ -92,6 +107,24 @@ schoolCard)` 构造一次，并间接持有 app 级的 repository）。所以"�
 不是「这次要不要查」。先画旧值，网络回来再替换。反过来，因为有缓存，**失败不需要自动重试**——
 重试的入口是用户点击，避免离线时反复打接口；也因此这里不做定时刷新，要看新数据就点一下卡片。
 
+### 页面例外：打开时自己查一次
+
+上面两条说的是**聚焦页上的卡片**。页面（`EnergyScreen`、`SchoolCardScreen`……）不一样：打开一个页面是
+用户明确的、一次性的动作，所以页面在打开时自己查一次
+（`LaunchedEffect(repository) { if (!state.isLoading) repository.refresh() }`）——缓存是「第一帧先画什么」，
+不是「这次要不要查」。其余规矩照旧：不做定时刷新、不做自动重试，失败后重新查的入口是用户点刷新或重新选
+一次条件。
+
+页面查的是用户选的参数（日期区间、周次……）时，多三条：
+
+- **参数进快照，和结果一起更新。** 用户改了区间，旧行必须在同一帧里清掉：一屏数据配上另一个标题，和把
+  昨天的数字贴在「今日支出」下面一样错。`SchoolCardFlowsRepository.selectRange` 就是这么做的；而
+  **同一个**区间上的刷新要保留旧行——那才是「刷新」的意思。
+- **缓存按参数存，读取时校验参数覆盖。** 见上面 `SchoolCardTradeList.json` 那一节：值描述的是一段区间，
+  所以区间必须跟着值一起落盘，且只有存下的区间**包含**要问的区间才用。
+- **别把服务端的筛选当成筛选。** 两个日期只是「服务端理解的窗口」；回来的行要按自己的区间再过滤一次
+  （`transactionsIn`），否则越界的行会画在一个点名了别的日期的标题下面。
+
 ## 新增一张卡片的检查清单
 
 - [ ] `data/<feature>/` 下建 `XxxCache`、`XxxModels`（含金额/时间的规范化）、`XxxApi`、`XxxSession`（含失败回落与 `XxxCacheHint`）、`XxxRepository`。
@@ -102,6 +135,8 @@ schoolCard)` 构造一次，并间接持有 app 级的 repository）。所以"�
 - [ ] 写 `XxxRepositoryTest`：首帧显示缓存、错误不清空已有值、成功后清 `cacheHint`。
 - [ ] tile 只画不抓；状态文案在小标题；缓存值带 `· 缓存`。
 - [ ] 在 `CardRefresher` 加构造参数和一行刷新，并在 `HomeScreen` 构造处补依赖；**不要**用页面里的 `LaunchedEffect`。
+- [ ] 有页面的话（不只是 tile）：页面自己在打开时查一次；查的是用户选的参数时，参数进快照、和结果一起清掉旧值，
+      并按上面的规矩单独存一份「参数 + 结果」的缓存。
 - [ ] 在 `README.md` 的 slice 清单和模块表里登记这个模块。
 
 ## 现有实现对照
@@ -110,6 +145,7 @@ schoolCard)` 构造一次，并间接持有 app 级的 repository）。所以"�
 |---|---|---|---|
 | 电量 | `EnergyInfo.json` | 无（余额不跨天失效）；另存 `ElectricityHistory.json` 曲线 | `data/energy/EnergyRepository.kt` |
 | 校园卡 | `SchoolCard.json` | `knownDate`：当日支出/收入/笔数描述的那一天 | `data/schoolcard/SchoolCardRepository.kt` |
+| 校园卡页面（区间流水） | `SchoolCardTradeList.json` | 区间本身：只在存下的区间**包含**要问的区间时才用 | `data/schoolcard/SchoolCardFlowsRepository.kt` |
 | 课表 | `ClassTable.json` | `semesterCode`：这份课表属于哪个学期 | `data/timetable/TimetableRepository.kt` |
 
 课表的缓存文件就是原始项目的那个名字、那份裸 `ClassTableData` JSON（它自带的桌面小组件也读这个文件），

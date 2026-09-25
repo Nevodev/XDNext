@@ -19,4 +19,7 @@ import androidx.compose.runtime.Immutable
 @Immutable
 class TileActions(
     val openTimetable: () -> Unit,
+    val openEnergy: () -> Unit,
+    val openWaterFee: () -> Unit,
+    val openSchoolCard: () -> Unit,
 )

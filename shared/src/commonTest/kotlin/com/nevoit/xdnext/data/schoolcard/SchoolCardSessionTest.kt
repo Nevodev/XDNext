@@ -36,6 +36,7 @@ import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -104,6 +105,105 @@ class SchoolCardSessionTest {
         )
     }
 
+    // --- the range query ------------------------------------------------------------------------
+
+    @Test
+    fun asksForTheDaysThePagePicked() = runTest {
+        // The original's own page, kept: the two dates go out as the query's window, and whatever the
+        // picker produced is what the card system is asked for.
+        val fixture = Fixture()
+        fixture.tradeList("[]")
+
+        fixture.session.getTransactions(SchoolCardRange(LocalDate(2026, 3, 1), LocalDate(2026, 3, 5)))
+
+        assertEquals(
+            """{"beginDate":"2026-03-01","endDate":"2026-03-05","tradeType":"-1","openid":"OPENID-1"}""",
+            fixture.tradeRequestBody(),
+        )
+    }
+
+    @Test
+    fun answersARangeWithItsOwnRowsOnly() = runTest {
+        // The card system's window is not taken on trust: a row that arrives outside the days asked for
+        // would otherwise be drawn under a heading that named other ones, so the same filter the day's
+        // totals use is applied to the answer.
+        val fixture = Fixture()
+        fixture.tradeList(
+            """
+            [
+              {"mername":"食堂","txdate":"2026-03-05 11:30:00","txamt":"-12.30"},
+              {"mername":"圈存","txdate":"2026-03-05 09:00:00","txamt":"200.00"},
+              {"mername":"超市","txdate":"2026-03-07 18:00:00","txamt":"-30.00"},
+              {"mername":"食堂","txdate":"2026-02-27 12:00:00","txamt":"-50.00"}
+            ]
+            """,
+        )
+
+        val result = fixture.session.getTransactions(
+            SchoolCardRange(LocalDate(2026, 3, 1), LocalDate(2026, 3, 5)),
+        )
+
+        assertFalse(result.isCache)
+        assertEquals(
+            listOf("食堂" to -1230L, "圈存" to 20000L),
+            result.data.map { it.merchant to it.amountCents },
+            "Newest first, and neither the day after nor the week before is in this window.",
+        )
+    }
+
+    @Test
+    fun remembersTheWindowARangeWasReadFor() = runTest {
+        // What the cache is keyed by: the rows answer a question, and a later visit that asks a narrower
+        // window inside it can be answered from disk without another request. Note that the query itself
+        // never consults the cache *first* — it is the page's first frame that does, through this read.
+        val fixture = Fixture()
+        fixture.tradeList(
+            """
+            [
+              {"mername":"食堂","txdate":"2026-03-05 11:30:00","txamt":"-12.30"}
+            ]
+            """,
+        )
+        val month = SchoolCardRange(LocalDate(2026, 3, 1), LocalDate(2026, 3, 31))
+        fixture.session.getTransactions(month)
+
+        val later = fixture.session.getCachedTransactions(
+            SchoolCardRange(LocalDate(2026, 3, 5), LocalDate(2026, 3, 5)),
+        )!!
+
+        assertEquals(listOf("食堂"), later.data.map { it.merchant }, "Today is inside the month that was read.")
+        assertTrue(later.isCache)
+    }
+
+    @Test
+    fun fallsBackToTheCachedRowsWhenTheRangeCannotBeRead() = runTest {
+        val fixture = Fixture()
+        fixture.tradeList("""[{"mername":"食堂","txdate":"2026-03-05","txamt":"-12.30"}]""")
+        val range = SchoolCardRange(LocalDate(2026, 3, 5), LocalDate(2026, 3, 5))
+        fixture.session.getTransactions(range)
+
+        // The second attempt cannot reach the card system at all, which is what a phone off campus sees:
+        // the query and its retry both fail, and the rows read a moment ago are what is left.
+        fixture.failTradeListOnAttempts = setOf(2, 3)
+        val result = fixture.session.getTransactions(range)
+
+        assertTrue(result.isCache)
+        assertEquals(SchoolCardCacheHint.NETWORK_FAILED.key, result.hintKey)
+        assertEquals(1230L, result.data.expenseCents())
+    }
+
+    @Test
+    fun aRangeWithNothingCachedThrowsRatherThanAnsweringWithAnEmptyList() = runTest {
+        // An empty list is a claim — "nothing was spent in these days" — and a failure is not entitled to
+        // make it. The page shows the failure instead, which is what `SchoolCardFlowsRepository` records.
+        val fixture = Fixture()
+        fixture.failTradeListOnAttempts = setOf(1, 2)
+
+        assertFailsWith<SchoolCardNetworkException> {
+            fixture.session.getTransactions(SchoolCardRange(LocalDate(2026, 3, 5), LocalDate(2026, 3, 5)))
+        }
+    }
+
     @Test
     fun reusesTheHandleForLaterReads() = runTest {
         val fixture = Fixture()
@@ -166,7 +266,10 @@ class SchoolCardSessionTest {
         val result = fixture.session.getSchoolCard()
 
         assertEquals("25.60", result.data.balance)
-        assertNull(result.data.todayExpenseCents)
+        assertNull(
+            result.data.todayExpenseCents,
+            "A day nobody could read is unknown — the tile says so rather than showing a zero.",
+        )
     }
 
     @Test
@@ -237,12 +340,17 @@ class SchoolCardSessionTest {
     // --- fixture --------------------------------------------------------------------------------
 
     /**
-     * The whole stack on a mock engine: the real IDS session, the real card API, and a real cache file
+     * The whole stack on a mock engine: the real IDS session, the real card API, and real cache files
      * under a temporary directory.
+     *
+     * Both caches are real files, not fakes: "what is remembered for later" is a claim about the disk,
+     * and a fake would answer the range and freshness questions the way the test expected rather than the
+     * way the file format does.
      */
     private class Fixture(storedCredentials: Boolean = true) {
 
         val cache: SchoolCardCache
+        val tradeListCache: SchoolCardTradeListCache
         val session: SchoolCardSession
 
         /** The trade list the engine answers with; `[]` unless a test says otherwise. */
@@ -282,6 +390,7 @@ class SchoolCardSessionTest {
             val directory =
                 FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "xdnext-school-card-test-$instance"
             cache = SchoolCardCache(FileSystem.SYSTEM, directory, JSON)
+            tradeListCache = SchoolCardTradeListCache(FileSystem.SYSTEM, directory, JSON)
 
             val engine = MockEngine { request ->
                 requests += request
@@ -371,6 +480,7 @@ class SchoolCardSessionTest {
                 ids = ids,
                 api = SchoolCardApi(client, json),
                 cache = cache,
+                tradeListCache = tradeListCache,
                 captcha = NoCaptchaSolver,
                 clock = FixedClock(LocalDate(2026, 3, 5)),
                 timeZone = TimeZone.UTC,

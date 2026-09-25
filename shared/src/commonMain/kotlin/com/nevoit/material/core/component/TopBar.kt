@@ -29,7 +29,7 @@ private val LeadingModifier = Modifier.layoutId(TopBarSlot.Leading)
 private val TitleModifier = Modifier.layoutId(TopBarSlot.Title)
 private val TrailingModifier = Modifier.layoutId(TopBarSlot.Trailing)
 
-private val TopBarHeight = 72.dp
+val TopBarHeight = 72.dp
 
 private val Gap = 12.dp
 

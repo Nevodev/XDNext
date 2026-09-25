@@ -9,6 +9,9 @@ import com.nevoit.material.navigation.rememberNavigator
 import com.nevoit.material.navigation.shape.clipShape
 import com.nevoit.material.navigation.shape.deviceCornerShape
 import com.nevoit.xdnext.ui.home.HomeScreen
+import com.nevoit.xdnext.ui.energy.EnergyScreen
+import com.nevoit.xdnext.ui.energy.WaterFeeScreen
+import com.nevoit.xdnext.ui.schoolcard.SchoolCardScreen
 import com.nevoit.xdnext.ui.timetable.ClassChangeScreen
 import com.nevoit.xdnext.ui.timetable.NotArrangedScreen
 import com.nevoit.xdnext.ui.timetable.TimetableScreen
@@ -38,7 +41,14 @@ fun AppNavHost(modifier: Modifier = Modifier) {
         when (val destination = destination) {
             AppDestination.Home -> HomeScreen(
                 onOpenTimetable = { navigate(AppDestination.Timetable) },
+                onOpenEnergy = { navigate(AppDestination.Energy) },
+                onOpenWaterFee = { navigate(AppDestination.WaterFee) },
+                onOpenSchoolCard = { navigate(AppDestination.SchoolCard) },
             )
+
+            AppDestination.Energy -> EnergyScreen(onBack = ::back)
+            AppDestination.WaterFee -> WaterFeeScreen(onBack = ::back)
+            AppDestination.SchoolCard -> SchoolCardScreen(onBack = ::back)
 
             AppDestination.Timetable -> TimetableScreen(
                 onBack = ::back,

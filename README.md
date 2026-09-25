@@ -55,9 +55,10 @@ last month of electricity readings and the last year of water ones — and keeps
 remain-over-time history and the low-balance reminder's settings on the device. See
 [The energy query](#the-energy-query).
 
-**Slice 4 — the campus card.** The card's balance and today's spending, behind the campus page's payment
-tile; the card page itself — the transaction list, the date range, the payment QR code — is not built.
-See [The campus card](#the-campus-card).
+**Slice 4 — the campus card.** The card's balance and today's spending behind the campus page's payment
+tile, and 校园卡 itself: the flows of a date range, with the range changed from a calendar, and today's
+spending total above them. The payment QR code is **not** built — it needs the card system's virtual-card
+page and a barcode to render it from. See [The campus card](#the-campus-card).
 
 Both live cards are cached on the device and refreshed once at start-up. That is a rule rather than two
 implementations: **a new card is expected to follow it**, and [`docs/card-cache.md`](docs/card-cache.md)
@@ -110,13 +111,14 @@ Inside `shared/src/commonMain/kotlin/com/nevoit/xdnext`:
 | `data.fetch` | `FetchResult` — a value that is either fresh or served from the cache, with the reason. |
 | `data.ids` | The IDS/CAS protocol: endpoints, both AES schemes, page parsing, HTTP calls, captcha signing, the second-factor client, models. |
 | `data.net` | Ktor client factory, persistent cookie store, URL resolution. |
-| `data.schoolcard` | The campus card system: the OAuth landing page and its `openid`, the balance scrape, today's transactions, the balance cache, the state holder. |
+| `data.schoolcard` | The campus card system: the OAuth landing page and its `openid`, the balance scrape, the range transaction query, the two caches (balance + today's totals, and a window's flows), the tile's state holder and the page's. |
 | `data.session` | `IdsSessionRepository` (the login state machine), `CredentialStore`, and the two brokers that hand interactive steps to the UI. |
 | `data.timetable` | The registrar's timetable: the eHall endpoints, the row parser and the schedule-adjustment merge, the 61-block grid's arithmetic, the `ClassTable.json` cache, the session and the state holder. |
 | `di` | Koin modules. |
 | `ui.home` | The shell: the bottom bar, the three pages, and the home-screen grid packer. |
 | `ui.icon` | Material Symbols as an icon font: `ProvideMaterialSymbols` and `SymbolIcon`. |
 | `ui.login` | Login screen, captcha dialog, second-factor dialog, and their view model. |
+| `ui.schoolcard` | 校园卡 — the range picker, the flow table and the page's summary, plus the wording its two headings are built from. |
 | `ui.timetable` | 我的日程表 — the week strip and its 5×5 overview, the 61-block grid with its period column, date row and class cards, the current-time line, the class palette, and the two list pages. |
 | `ui` | `AppNavHost` and `AppDestination`: which pages exist and what opens each one. |
 
@@ -334,8 +336,10 @@ Two things differ from `EnergySession` on purpose:
   balance and an *unknown* spending figure, and the tile says so. The alternative, caching the number
   without its day, is a wrong answer under the label 今日支出 that nothing on screen could reveal.
 - **the two reads are independent.** A transaction query that fails still leaves a balance worth showing,
-  and the original's own card page and home page each did only one of them. They are run independently
-  but *reported* together, because a failure swallowed inside the attempt is a retry that never happens.
+  and the original's own card page and home page each did only one of them. Neither is thrown away for the
+  other's sake — half a card is a card, and only a pass where *both* reads failed becomes a failure. That
+  is also what triggers the retry, since a stale handle is refused by both requests; what is *not*
+  inherited is the original's `forceRefresh`, which re-entered the very check it was meant to bypass.
 
 Both live cards are cached on the device and refreshed once per process, from `ui.home.CardRefresher`.
 The guard lives on that object rather than in a composition, because the focus page is unmounted when the
@@ -363,6 +367,40 @@ What remains unmeasured is the account page's exact markup: unlike the energy pr
 recorded wire capture for it, so the positional path is a reading of the original's source rather than a
 measurement. The parsing is therefore tested against markup of that shape, and against a page that does
 not match at all.
+
+### The card page is a range query
+
+校园卡 (`ui.schoolcard.SchoolCardScreen`) is the original's `school_card_window.dart`, and what that window
+is is a *question*: the transactions between two days. So the page holds the days as well as the rows
+(`SchoolCardRange`), the summary at the top sums **those** rows — not a second reading of the card — and
+changing the days re-queries the list:
+
+- **the days are picked from a calendar dialog** (`SchoolCardRangePicker`), which is the original's
+  `calendar_date_picker2` range dialog in the parts that matter: a month with arrows either side of its
+  name, a 7-column grid, two taps to choose a window, 确定/取消 underneath. Days after today are not
+  selectable, because the card system has nothing to say about them, and a window reaching into next week
+  would answer with a partial list that looks complete.
+- **the page opens on today**, so its summary says 今日支出 and shows the same figure the campus tile does;
+  widening the range relabels it 本区间支出. The original opened on the month-to-date instead. Both are the
+  same query — what the page opens on is a choice about what to show first, not about what can be asked.
+- **a new range clears the rows** before the query runs (`SchoolCardFlowsRepository.selectRange`). Rows
+  describe a window, so drawing an earlier window's list under a new heading would be the same wrong answer
+  a stale total would be. A refresh of the *same* range keeps them, which is what "refreshing" means.
+- **the rows are filtered to the requested range** after they arrive (`transactionsIn`), rather than
+  trusted from the server: the two dates are the server's idea of the window, and a row it returns outside
+  them would otherwise be drawn under a heading that named other days. The same pass produces the summary's
+  figure, so the number above the table is the table's own arithmetic rather than a second reading of it.
+
+A second cache file backs it: `SchoolCardTradeList.json` holds a window's rows **together with the window**,
+and is reused only when the stored window *covers* the requested one. That is the "a value is stored with
+what it describes" rule applied to a query rather than to a day — rows with no window are the same mistake
+as a spending figure with no date — and covering is what makes the cache useful rather than merely safe: a
+visit that read the whole month has already read today's rows as part of it.
+
+The page asks for a query when it opens, instead of only when it has nothing, because spending changes
+while the app sits there; the cache is what covers the seconds that query takes, off campus included. A
+failure never blanks what is on screen: the rows stay, with the reason
+(`SchoolCardCacheHint.flowsMessage`) under them.
 
 ## The timetable
 

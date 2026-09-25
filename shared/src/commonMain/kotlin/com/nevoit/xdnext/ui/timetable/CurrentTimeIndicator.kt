@@ -16,7 +16,7 @@ import com.kyant.shapes.Capsule
 import com.nevoit.material.core.component.Text
 import com.nevoit.material.theme.MaterialTheme
 import com.nevoit.xdnext.data.timetable.TimetableLayout
-import com.nevoit.xdnext.ui.home.rememberCardValueFontFamily
+import com.nevoit.xdnext.ui.shared.rememberCardValueFontFamily
 import kotlinx.datetime.LocalDateTime
 import kotlin.math.max
 

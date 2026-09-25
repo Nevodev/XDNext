@@ -39,11 +39,13 @@ class HomeTileRegistryTest {
 
     @Test
     fun theDefaultOrderIsThePagesLayout() {
-        // The banner owns rows 0-1, the three widgets stack down the left in rows 2-5, and the shortcuts
-        // fill the free half beside the third widget before starting the last row.
+        // The banner owns rows 0-1, the three square widgets then go down in pairs (0,2 / 2,2 / 0,4), and
+        // the shortcuts fill the free half beside the third widget before running along the bottom two
+        // rows. Thirteen tiles: one banner, three widgets, nine shortcuts.
         assertEquals(
             "0,0 4x2 | 0,2 2x2 | 2,2 2x2 | 0,4 2x2 | " +
-                    "2,4 1x1 | 3,4 1x1 | 2,5 1x1 | 3,5 1x1 | 0,6 1x1 | 1,6 1x1 | 2,6 1x1 | 3,6 1x1",
+                    "2,4 1x1 | 3,4 1x1 | 2,5 1x1 | 3,5 1x1 | " +
+                    "0,6 1x1 | 1,6 1x1 | 2,6 1x1 | 3,6 1x1 | 0,7 1x1",
             DefaultHomeOrder.map { it.span }.let(::packTiles).render(),
         )
     }
@@ -63,7 +65,11 @@ class HomeTileRegistryTest {
             placements.first().span,
             "the first tile is now the widget"
         )
-        assertEquals(TilePlacement(0, 5, TileSpan(4, 2)), placements.last())
+        assertEquals(
+            TilePlacement(0, 6, TileSpan(4, 2)),
+            placements.last(),
+            "the other twelve tiles reach row 6, which is the first row the banner still fits in.",
+        )
         assertEquals(HomeTileId.Timetable.span, placements.last().span)
     }
 }

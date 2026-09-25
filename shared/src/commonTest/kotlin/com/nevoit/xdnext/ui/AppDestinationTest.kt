@@ -26,6 +26,9 @@ class AppDestinationTest {
         val pages = listOf(
             AppDestination.Home,
             AppDestination.Timetable,
+            AppDestination.Energy,
+            AppDestination.WaterFee,
+            AppDestination.SchoolCard,
             AppDestination.NotArrangedClasses,
             AppDestination.ClassChanges,
         )

@@ -19,7 +19,7 @@ import com.nevoit.material.core.component.Text
 import com.nevoit.material.core.component.VGap
 import com.nevoit.material.core.modifier.thenIf
 import com.nevoit.material.theme.MaterialTheme
-import com.nevoit.xdnext.ui.home.rememberCardValueFontFamily
+import com.nevoit.xdnext.ui.shared.rememberCardValueFontFamily
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus

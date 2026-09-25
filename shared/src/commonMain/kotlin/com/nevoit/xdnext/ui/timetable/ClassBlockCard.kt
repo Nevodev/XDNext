@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.kyant.shapes.RoundedRectangle
 import com.nevoit.material.core.component.Text
 import com.nevoit.xdnext.data.timetable.ClassBlock
-import com.nevoit.xdnext.ui.home.rememberCardValueFontFamily
+import com.nevoit.xdnext.ui.shared.rememberCardValueFontFamily
 
 /**
  * One rectangle of the grid: a class, or several that clash, drawn as one card.

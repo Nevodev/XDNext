@@ -24,10 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nevoit.material.core.component.Surface
@@ -40,6 +38,8 @@ import com.nevoit.material.theme.MaterialTheme
 import com.nevoit.material.theme.local.LocalContentColor
 import com.nevoit.material.theme.local.ProvideContentColor
 import com.nevoit.material.theme.toShape
+import com.nevoit.xdnext.ui.shared.rememberCardValueFontFamily
+import com.nevoit.xdnext.ui.shared.rememberValueWithUnit
 import com.nevoit.xdnext.ui.symbols.SymbolIcon
 
 @Composable
@@ -101,20 +101,12 @@ fun InfoCard(
     trailing: @Composable BoxScope.() -> Unit = {},
 ) {
     val colors = MaterialTheme.colors
-
-    // Use annotated string to prevent font bugs in on HyperOS.
-    val valueWithUnit = AnnotatedString.Builder().apply {
-        withStyle(
-            MaterialTheme.type.title2.copy(fontFamily = rememberCardValueFontFamily()).toSpanStyle()
-        ) {
-            append(value)
-        }
-        withStyle(
-            MaterialTheme.type.title2.toSpanStyle()
-        ) {
-            unit?.let { append("\u2006$it") } // 1/6 rem space
-        }
-    }.toAnnotatedString()
+    val valueWithUnit = rememberValueWithUnit(
+        value = value,
+        unit = unit,
+        style = MaterialTheme.type.title2,
+        unitColor = colors.content,
+    )
 
     Card(modifier = modifier, onClick = onClick) {
         Row(modifier = Modifier.fillMaxSize()) {
@@ -166,20 +158,12 @@ fun WidgetTile(
     onClick: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colors
-
-    // Use annotated string to prevent font bugs in on HyperOS.
-    val valueWithUnit = AnnotatedString.Builder().apply {
-        withStyle(
-            MaterialTheme.type.title2.copy(fontFamily = rememberCardValueFontFamily()).toSpanStyle()
-        ) {
-            append(value)
-        }
-        withStyle(
-            MaterialTheme.type.title2.toSpanStyle().copy(color = colors.content.copy(.25f))
-        ) {
-            unit?.let { append("\u2006$it") } // 1/6 rem space
-        }
-    }.toAnnotatedString()
+    val valueWithUnit = rememberValueWithUnit(
+        value = value,
+        unit = unit,
+        style = MaterialTheme.type.title2,
+        unitColor = colors.content.copy(alpha = 0.25f),
+    )
 
     Card(modifier = modifier, onClick = onClick) {
         Box(
@@ -220,9 +204,16 @@ fun WidgetTile(
 
 /** One single-cell shortcut: an accent icon over a short label. */
 @Composable
-fun StatTile(icon: String, label: String, modifier: Modifier = Modifier) {
+fun StatTile(
+    icon: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     Surface(
-        modifier = modifier.clip(MaterialTheme.specs.cardShape),
+        modifier = modifier
+            .clip(MaterialTheme.specs.cardShape)
+            .thenIf(onClick != null) { clickable(onClick = onClick!!) },
         color = MaterialTheme.colors.cardBackground,
         contentColor = MaterialTheme.colors.content,
     ) {
@@ -291,15 +282,16 @@ fun ListRow(
 }
 
 @Composable
-private fun IconBox(
+fun IconBox(
     icon: String,
     shape: Shape = CircleShape,
     background: Color,
     contentColor: Color,
     size: Dp = 48.dp,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(size)
             .clip(shape)
             .background(background),

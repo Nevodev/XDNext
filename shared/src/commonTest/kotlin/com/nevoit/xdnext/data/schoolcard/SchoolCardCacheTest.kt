@@ -40,6 +40,20 @@ class SchoolCardCacheTest {
     }
 
     @Test
+    fun keepsTheBalanceAndDropsTheDayWhenTheRefreshOnlyReadOneOfThem() {
+        // The two parts of a card age differently: the balance is still the balance, and a day's total
+        // with no day beside it is not a total. Nothing here carries rows, either — the card page's list
+        // belongs to its own file and its own window, see `SchoolCardTradeListCache`.
+        val cache = cache()
+        cache.save(snapshot(balance = "25.60", expense = null), knownDate = null)
+
+        val result = cache.read(today)!!
+
+        assertEquals("25.60", result.data.balance)
+        assertNull(result.data.todayExpenseCents)
+    }
+
+    @Test
     fun dropsTheDaysTotalsOnceTheDayHasPassed() {
         // The whole point: the balance survives, the day's figure does not, and the tile is then able to
         // say the spending is unknown instead of showing yesterday's under 今日支出.
@@ -76,6 +90,26 @@ class SchoolCardCacheTest {
 
         assertEquals("88.00", result.data.balance)
         assertNull(result.data.todayExpenseCents)
+    }
+
+    @Test
+    fun readsAFileWrittenBeforeTheFlowsWereStored() {
+        // The flow list used to live in this very file, with the day's figures. Such a file must still
+        // load: the balance and the day's totals are what this cache is for now, and the rows it also
+        // happens to carry are ignored rather than taken as *this* file's answer — a list asked for a
+        // window is `SchoolCardTradeListCache`'s, and reading one out of a file whose day has passed
+        // would be exactly the mistake the two files exist to avoid.
+        val (direction, cache) = cacheIn()
+        write(
+            direction,
+            """{"balance":"88.00","knownDate":"2026-03-05","todayExpenseCents":1230,""" +
+                    """"transactions":[{"merchant":"超市","time":"2026-03-05 12:03:11","amountCents":-1230}]}""",
+        )
+
+        val result = cache.read(today)!!
+
+        assertEquals("88.00", result.data.balance)
+        assertEquals(1230L, result.data.todayExpenseCents)
     }
 
     @Test

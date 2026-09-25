@@ -16,7 +16,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,11 +35,11 @@ import com.nevoit.xdnext.data.schoolcard.centsToYuanText
 import com.nevoit.xdnext.data.timetable.TimetableCalendar
 import com.nevoit.xdnext.data.timetable.TimetableRepository
 import com.nevoit.xdnext.data.timetable.TimetableState
+import com.nevoit.xdnext.ui.shared.rememberCardValueFontFamily
 import com.nevoit.xdnext.ui.symbols.Symbol
 import com.nevoit.xdnext.ui.timetable.TimetableStrings
 import com.nevoit.xdnext.ui.timetable.classSwatchFor
 import com.nevoit.xdnext.ui.timetable.rememberTimetableNow
-import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -57,9 +56,6 @@ fun FocusScreen(
     val energyState by energy.state.collectAsState()
     val schoolCardState by schoolCard.state.collectAsState()
     val timetableState by timetable.state.collectAsState()
-    val scope = rememberCoroutineScope()
-    val refreshEnergy: () -> Unit = { scope.launch { energy.refreshElectricityInfo() } }
-    val refreshSchoolCard: () -> Unit = { scope.launch { schoolCard.refreshSchoolCard() } }
 
     // The banner counts what is left of *today*, so it follows the clock rather than the date the page
     // was opened on: a class that ends at 10:05 stops being counted at 10:05, with nothing to tap.
@@ -82,9 +78,7 @@ fun FocusScreen(
                         HomeTile(
                             id = id,
                             energyState = energyState,
-                            onRefreshEnergy = refreshEnergy,
                             schoolCardState = schoolCardState,
-                            onRefreshSchoolCard = refreshSchoolCard,
                             timetableState = timetableState,
                             now = now,
                             actions = actions,
@@ -100,9 +94,7 @@ fun FocusScreen(
 private fun HomeTile(
     id: HomeTileId,
     energyState: EnergyState,
-    onRefreshEnergy: () -> Unit,
     schoolCardState: SchoolCardState,
-    onRefreshSchoolCard: () -> Unit,
     timetableState: TimetableState,
     now: LocalDateTime,
     actions: TileActions,
@@ -116,7 +108,7 @@ private fun HomeTile(
 
         HomeTileId.Energy -> EnergyTile(
             state = energyState,
-            onRefresh = onRefreshEnergy,
+            onClick = { actions.openEnergy() },
         )
 
         HomeTileId.Library -> WidgetTile(
@@ -129,12 +121,18 @@ private fun HomeTile(
 
         HomeTileId.CampusPay -> SchoolCardTile(
             state = schoolCardState,
-            onRefresh = onRefreshSchoolCard,
+            onClick = { actions.openSchoolCard() },
         )
 
         HomeTileId.Grade, HomeTileId.Exam, HomeTileId.EmptyRoom, HomeTileId.Attendance,
-        HomeTileId.Network, HomeTileId.Water, HomeTileId.Science, HomeTileId.Sport,
+        HomeTileId.Network, HomeTileId.Science, HomeTileId.Sport,
             -> ShortcutSpecs.getValue(id).let { StatTile(icon = it.symbol, label = it.label) }
+
+        HomeTileId.Water -> ShortcutSpecs.getValue(id).let { StatTile(icon = it.symbol, label = it.label) }
+
+        HomeTileId.WaterFee -> ShortcutSpecs.getValue(id).let {
+            StatTile(icon = it.symbol, label = it.label, onClick = { actions.openWaterFee() })
+        }
     }
 }
 
@@ -272,7 +270,7 @@ private fun freshnessNote(isFromCache: Boolean, hasValue: Boolean): String? =
 @Composable
 private fun SchoolCardTile(
     state: SchoolCardState,
-    onRefresh: () -> Unit,
+    onClick: () -> Unit,
 ) {
     val snapshot = state.snapshot
     val expense = snapshot?.todayExpenseCents
@@ -297,14 +295,14 @@ private fun SchoolCardTile(
                 freshnessNote(state.isFromCache, snapshot != null)
             ).joinToString(" ")
         },
-        onClick = onRefresh,
+        onClick = onClick,
     )
 }
 
 @Composable
 private fun EnergyTile(
     state: EnergyState,
-    onRefresh: () -> Unit,
+    onClick: () -> Unit,
 ) {
     val info = state.info
     WidgetTile(
@@ -324,6 +322,6 @@ private fun EnergyTile(
         }?.let { line ->
             listOfNotNull(line, freshnessNote(state.isFromCache, info != null)).joinToString(" ")
         },
-        onClick = onRefresh
+        onClick = onClick
     )
 }

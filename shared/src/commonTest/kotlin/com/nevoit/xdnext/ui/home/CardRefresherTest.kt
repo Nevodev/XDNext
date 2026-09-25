@@ -9,8 +9,10 @@ import com.nevoit.xdnext.data.energy.EnergyRepository
 import com.nevoit.xdnext.data.energy.MeterInfo
 import com.nevoit.xdnext.data.fetch.FetchResult
 import com.nevoit.xdnext.data.schoolcard.SchoolCardDataSource
+import com.nevoit.xdnext.data.schoolcard.SchoolCardRange
 import com.nevoit.xdnext.data.schoolcard.SchoolCardRepository
 import com.nevoit.xdnext.data.schoolcard.SchoolCardSnapshot
+import com.nevoit.xdnext.data.schoolcard.SchoolCardTransaction
 import com.nevoit.xdnext.data.timetable.ClassTableData
 import com.nevoit.xdnext.data.timetable.TimetableDataSource
 import com.nevoit.xdnext.data.timetable.TimetableRepository
@@ -189,6 +191,17 @@ class CardRefresherTest {
                 ),
             )
         }
+
+        // The warm-up refreshes the tile's card, not the card page's list — the list is the page's own
+        // question and its own repository, so nothing here ever reads flows.
+        override fun getCachedTransactions(
+            range: SchoolCardRange,
+        ): FetchResult<List<SchoolCardTransaction>>? = null
+
+        override suspend fun getTransactions(
+            range: SchoolCardRange,
+        ): FetchResult<List<SchoolCardTransaction>> =
+            throw UnsupportedOperationException("the warm-up does not read the card page's flows")
     }
 
     /**

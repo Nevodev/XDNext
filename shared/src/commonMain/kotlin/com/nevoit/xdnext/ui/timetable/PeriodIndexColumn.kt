@@ -12,7 +12,7 @@ import com.nevoit.material.core.component.Text
 import com.nevoit.material.theme.MaterialTheme
 import com.nevoit.xdnext.data.timetable.IndexRow
 import com.nevoit.xdnext.data.timetable.TimetableLayout
-import com.nevoit.xdnext.ui.home.rememberCardValueFontFamily
+import com.nevoit.xdnext.ui.shared.rememberCardValueFontFamily
 
 /**
  * The grid's left column: thirteen rows of period numbers and times, with the two breaks named.

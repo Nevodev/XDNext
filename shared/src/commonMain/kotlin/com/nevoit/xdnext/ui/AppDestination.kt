@@ -31,6 +31,16 @@ sealed interface AppDestination {
     @Serializable
     data object Timetable : AppDestination
 
+    @Serializable
+    data object Energy : AppDestination
+
+    @Serializable
+    data object WaterFee : AppDestination
+
+    /** 校园卡 — today's spending and the flows it was summed from. */
+    @Serializable
+    data object SchoolCard : AppDestination
+
     /** 没有时间安排的科目 — the timetable's courses with no place in the week. */
     @Serializable
     data object NotArrangedClasses : AppDestination

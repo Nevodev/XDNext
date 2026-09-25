@@ -29,6 +29,7 @@ enum class HomeTileId {
     Attendance,
     Network,
     Water,
+    WaterFee,
     Science,
     Sport,
 }
@@ -43,7 +44,7 @@ val HomeTileId.span: TileSpan
         )
 
         HomeTileId.Grade, HomeTileId.Exam, HomeTileId.EmptyRoom, HomeTileId.Attendance,
-        HomeTileId.Network, HomeTileId.Water, HomeTileId.Science, HomeTileId.Sport -> TileSpan()
+        HomeTileId.Network, HomeTileId.Water, HomeTileId.WaterFee, HomeTileId.Science, HomeTileId.Sport -> TileSpan()
     }
 
 /**
@@ -64,6 +65,7 @@ val DefaultHomeOrder: List<HomeTileId> = listOf(
     HomeTileId.Attendance,
     HomeTileId.Network,
     HomeTileId.Water,
+    HomeTileId.WaterFee,
     HomeTileId.Science,
     HomeTileId.Sport,
 )
@@ -85,6 +87,7 @@ internal val ShortcutSpecs: Map<HomeTileId, ShortcutSpec> = mapOf(
     HomeTileId.Attendance to ShortcutSpec(Symbol.Assignment, "考勤查询"),
     HomeTileId.Network to ShortcutSpec(Symbol.Wifi, "网络查询"),
     HomeTileId.Water to ShortcutSpec(Symbol.Water, "宿舍水机"),
+    HomeTileId.WaterFee to ShortcutSpec(Symbol.WaterFee, "水费"),
     HomeTileId.Science to ShortcutSpec(Symbol.Science, "实验信息"),
     HomeTileId.Sport to ShortcutSpec(Symbol.Run, "体育信息"),
 )

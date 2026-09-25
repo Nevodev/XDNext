@@ -37,23 +37,13 @@ fun App() {
         ProvideClassPalette(palette = remember(seedColor) { palettes.courseColors(seedColor) }) {
             ProvideMaterialSymbols {
                 val login: LoginViewModel = koinInject()
-                // Once, on the first composition: the stored account goes back into the form, and a device
-                // that has logged in before restores its session behind the shell.
                 LaunchedEffect(login) { login.start() }
 
-                // Which screen this is was decided before anything was drawn. `loggedIn` is seeded in the
-                // view model's constructor from a preference read, not from a request, so a warm start
-                // composes the shell straight away — no frame shows the login screen and then navigates
-                // off it, which is a flash, not navigation. The two sides are not pages of the navigator
-                // and no transition is played between them: signing in or out swaps the composition, which
-                // is also why back cannot return to a form that has been answered.
                 val loggedIn by login.loggedIn.collectAsState()
 
                 if (loggedIn) {
                     AppNavHost()
                 } else {
-                    // The shell paints the page background in its own `Surface`; the login screen is the
-                    // whole composition when it is showing, so it has to bring its own.
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colors.pageBackground,
@@ -63,8 +53,6 @@ fun App() {
                     }
                 }
 
-                // Above both, because a background refresh can raise a slider captcha or a second factor
-                // long after the login screen is gone.
                 LoginInteractions(login)
             }
         }

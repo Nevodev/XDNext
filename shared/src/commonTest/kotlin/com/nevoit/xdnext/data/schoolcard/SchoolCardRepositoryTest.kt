@@ -151,5 +151,16 @@ class SchoolCardRepositoryTest {
 
         override suspend fun getSchoolCard(): FetchResult<SchoolCardSnapshot> =
             requireNotNull(next) { "the test did not stage a fetch" }.invoke()
+
+        // Not this holder's question: the card's own state is the tile's, and the flow list has its own
+        // repository and its own source — see `SchoolCardFlowsRepositoryTest`.
+        override fun getCachedTransactions(
+            range: SchoolCardRange,
+        ): FetchResult<List<SchoolCardTransaction>>? = null
+
+        override suspend fun getTransactions(
+            range: SchoolCardRange,
+        ): FetchResult<List<SchoolCardTransaction>> =
+            throw UnsupportedOperationException("the card's own state does not read flows")
     }
 }

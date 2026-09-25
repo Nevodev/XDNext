@@ -124,6 +124,7 @@ object Symbol {
     const val Sms = "sms"
     const val QrCode = "qr_code"
     const val Chevron = "chevron_right"
+    const val ChevronLeft = "chevron_left"
     const val ArrowBack = "arrow_back"
 
     /** The overflow menu's three dots. */
@@ -149,6 +150,7 @@ object Symbol {
     const val Assignment = "assignment"
     const val Wifi = "wifi"
     const val Water = "water_drop"
+    const val WaterFee = "water_damage"
     const val Science = "science"
     const val Run = "directions_run"
 
