@@ -21,3 +21,10 @@ node_modules/
 # Extracted copy of the original Flutter app (BenderBlog/traintime_pda). Kept locally as the
 # porting reference; never committed.
 reference/
+/.gradle-native/
+/.test-tmp/
+/.gradle-user
+/.tmp-compose-src
+/tools
+/gradle
+/*.py
