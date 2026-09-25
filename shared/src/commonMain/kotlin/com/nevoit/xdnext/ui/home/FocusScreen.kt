@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.kyant.shapes.RoundedRectangle
 import com.nevoit.material.core.component.PageHeader
 import com.nevoit.material.core.component.Text
+import com.nevoit.material.core.interaction.overscroll.rememberOwnRangeOverscrollEffect
 import com.nevoit.material.theme.MaterialShapes
 import com.nevoit.material.theme.MaterialTheme
 import com.nevoit.material.theme.toShape
@@ -188,14 +189,24 @@ private fun currentWeekText(state: TimetableState, now: LocalDateTime): String {
 /**
  * The remaining classes, one card each, scrolling when the day holds more of them than fit.
  *
- * A plain `Column` with a scroll state rather than a lazy list: this sits inside the campus page's own
- * lazy list, where a nested lazy list would be measured against an unbounded height.
+ * The column is a scroll of its own rather than the tail of the page's: `rememberOwnRangeOverscrollEffect`
+ * answers the page wherever the column has run out of range to use. Left to the page's list, a drag that
+ * reached the end of the column would carry on into the page, a fling would hand the page the velocity
+ * the column could not spend, and — with the page at its own end too — the band that appeared would be
+ * drawn around this column's content: a nested scroll only ever offers the page the leftover, and a page
+ * that never received the gesture has no band of its own to draw with.
+ *
+ * A lazy list is safe here although the page is one too: [HomeGrid] measures the banner into a
+ * tile-sized fixed box, so this list has a bounded height to lay itself out in.
  */
 @Composable
 private fun RemainingClasses(classes: List<TodayClass>) {
+    val band = rememberOwnRangeOverscrollEffect()
     LazyColumn(
         modifier = Modifier
-            .fillMaxSize(),
+            .fillMaxSize()
+            .then(band.modifier),
+        overscrollEffect = band,
         contentPadding = PaddingValues(end = 12.dp, top = 12.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
