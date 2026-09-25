@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The app is entirely network backed: every screen reads from a campus service. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".XdNextApplication"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <!--
+          allowBackup is off on purpose: credentials are sealed with an Android Keystore key that is
+          never backed up, so a restored copy of the encrypted blobs could not be decrypted anyway.
+          Excluding them from backup keeps that failure mode from ever being visible.
+        -->
+        <activity
+            android:exported="true"
+            android:name=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
