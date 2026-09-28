@@ -36,25 +36,15 @@ import androidx.compose.ui.unit.Velocity
  * LazyColumn(modifier = Modifier.then(band.modifier), overscrollEffect = band)
  * ```
  *
- * A list with no range of its own holds on to nothing. The framework offers overscroll only to a list
- * that can still scroll, so neither a drag nor a fling is routed through this effect there, and both are
- * handed on to the list above: with no range to spend the gesture inside and no band to draw it with, the
- * page is the only one that can move.
+ * A list with no range of its own is left alone rather than banded: [band] is only ever consulted while
+ * a list can still scroll, and nothing here invents a band of its own. Dragging such a list moves
+ * neither it nor the page.
  *
  * A list with nothing above it hands nothing up in the first place, so there this is [band] unchanged.
  */
 class OwnRangeOverscrollEffect(
     private val band: OverscrollEffect,
 ) : OverscrollEffect {
-
-    /**
-     * Whether this effect is being asked to handle the scroll under way.
-     *
-     * It only is while the list can still scroll somewhere: a list with nothing left to scroll is
-     * offered no overscroll at all, and its deltas reach [connection] untouched, which is how they are
-     * told apart from the ones this list has a range of its own to defend.
-     */
-    private var handling = false
 
     /** What the list last answered for: the part of a scroll or a fling it could not use. */
     private var answeredDelta = Offset.Zero
@@ -71,15 +61,11 @@ class OwnRangeOverscrollEffect(
             available: Offset,
             source: NestedScrollSource,
         ): Offset {
-            if (!handling) return Offset.Zero
-
             answeredDelta = available
             return available
         }
 
         override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-            if (!handling) return Velocity.Zero
-
             answeredVelocity = available
             return available
         }
@@ -99,33 +85,17 @@ class OwnRangeOverscrollEffect(
         delta: Offset,
         source: NestedScrollSource,
         performScroll: (Offset) -> Offset,
-    ): Offset {
-        val wasHandling = handling
-        handling = true
-        try {
-            return band.applyToScroll(delta, source) { offered ->
-                answeredDelta = Offset.Zero
-                performScroll(offered) - answeredDelta
-            }
-        } finally {
-            handling = wasHandling
-        }
+    ): Offset = band.applyToScroll(delta, source) { offered ->
+        answeredDelta = Offset.Zero
+        performScroll(offered) - answeredDelta
     }
 
     override suspend fun applyToFling(
         velocity: Velocity,
         performFling: suspend (Velocity) -> Velocity,
-    ) {
-        val wasHandling = handling
-        handling = true
-        try {
-            band.applyToFling(velocity) { offered ->
-                answeredVelocity = Velocity.Zero
-                performFling(offered) - answeredVelocity
-            }
-        } finally {
-            handling = wasHandling
-        }
+    ): Unit = band.applyToFling(velocity) { offered ->
+        answeredVelocity = Velocity.Zero
+        performFling(offered) - answeredVelocity
     }
 }
 

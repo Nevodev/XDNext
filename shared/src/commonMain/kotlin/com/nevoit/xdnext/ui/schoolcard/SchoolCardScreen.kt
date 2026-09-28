@@ -218,7 +218,7 @@ private fun summaryCaption(state: SchoolCardFlowsState, today: LocalDate): Strin
         }
     }
 
-    val line = "${rangeLabel(state.range, today)} · 共 ${state.transactions.size} 笔"
+    val line = "${rangeLabel(state.range, today)}共 ${state.transactions.size} 笔"
     return if (state.isFromCache) "$line · $CacheNote" else line
 }
 

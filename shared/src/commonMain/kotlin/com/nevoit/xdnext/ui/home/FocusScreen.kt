@@ -19,7 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.kyant.shapes.RoundedRectangle
 import com.nevoit.material.core.component.PageHeader
@@ -187,34 +189,69 @@ private fun currentWeekText(state: TimetableState, now: LocalDateTime): String {
 }
 
 /**
- * The remaining classes, one card each, scrolling when the day holds more of them than fit.
+ * The remaining classes, one card each: an ordinary column while the day fits the space it is given, and
+ * a lazy list once it does not.
  *
- * The column is a scroll of its own rather than the tail of the page's: `rememberOwnRangeOverscrollEffect`
- * answers the page wherever the column has run out of range to use. Left to the page's list, a drag that
- * reached the end of the column would carry on into the page, a fling would hand the page the velocity
- * the column could not spend, and — with the page at its own end too — the band that appeared would be
- * drawn around this column's content: a nested scroll only ever offers the page the leftover, and a page
- * that never received the gesture has no band of its own to draw with.
+ * The choice is the point. A column has no scroll of its own, so a drag over a day that fits finds
+ * nothing to scroll and stays the page's: the page moves, and when the page runs out it is the page's band
+ * that draws. A day that overflows gets a list instead, and that list is a scroll of its own:
+ * `rememberOwnRangeOverscrollEffect` answers the page wherever it runs out of range, so the page neither
+ * follows it nor draws a band for it.
  *
  * A lazy list is safe here although the page is one too: [HomeGrid] measures the banner into a
- * tile-sized fixed box, so this list has a bounded height to lay itself out in.
+ * tile-sized fixed box, and that same bound is what tells the two apart — the column is measured against
+ * it, unbounded, and the list is composed only when the column turns out to be taller.
  */
 @Composable
 private fun RemainingClasses(classes: List<TodayClass>) {
     val band = rememberOwnRangeOverscrollEffect()
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(band.modifier),
-        overscrollEffect = band,
-        contentPadding = PaddingValues(end = 12.dp, top = 12.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        items(classes) { entry ->
-            RemainingClassCard(entry)
+
+    SubcomposeLayout(modifier = Modifier.fillMaxSize()) { constraints ->
+        val column = subcompose(ClassesSlot.Column) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(PaddingValues(end = 12.dp, top = 12.dp, bottom = 12.dp)),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                classes.forEach { RemainingClassCard(it) }
+            }
+        }.first().measure(
+            Constraints(
+                maxWidth = constraints.maxWidth,
+                maxHeight = Constraints.Infinity,
+            )
+        )
+
+        // The box is bounded here; an unbounded pass is one this is free to fill, which is the same
+        // answer as fitting.
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else column.width
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else column.height
+
+        if (column.height <= height) {
+            layout(width, height) { column.placeRelative(0, 0) }
+        } else {
+            val list = subcompose(ClassesSlot.List) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(band.modifier),
+                    overscrollEffect = band,
+                    contentPadding = PaddingValues(end = 12.dp, top = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(classes) { entry ->
+                        RemainingClassCard(entry)
+                    }
+                }
+            }.first().measure(constraints)
+            layout(width, height) { list.placeRelative(0, 0) }
         }
     }
 }
+
+/** The two shapes [RemainingClasses] chooses between, as subcomposition slots of their own. */
+private enum class ClassesSlot { Column, List }
 
 /**
  * One class: its name over its room, its start over its end.
