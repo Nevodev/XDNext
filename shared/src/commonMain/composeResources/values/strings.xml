@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app's user-visible text.
+
+  Compose Multiplatform's string resources, which is this project's `strings.xml`: the same file, the
+  same `<string name=…>` shape and the same `%1$s` placeholders, read from `composeResources/values` so
+  a platform that is not Android reads them too. Every screen reaches them through
+  `stringResource(Res.string.…)`, which means a screen has no sentence of its own in it — no Kotlin
+  object of `const val`s, and nothing user-visible coming out of `data` either.
+
+  The modules from the earlier slices (`ui.timetable.TimetableStrings`, `EnergyCacheHint.message`, …)
+  still carry their text in Kotlin; they are the older arrangement and the mechanical follow-up, and this
+  file is where new text goes.
+
+  Keys are grouped by page, and the `%1$s`-style placeholders are the only thing a screen passes:
+  anything longer than a format string is built by the caller and interpolated as one argument, so a
+  translation never has to reorder a sentence's punctuation.
+-->
+<resources>
+
+    <!-- 设置 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_account">账号</string>
+    <string name="settings_section_timetable">课表</string>
+    <string name="settings_account_settings">账号设置</string>
+    <string name="settings_account_settings_detail">统一身份认证与各系统的账号密码</string>
+    <string name="settings_timetable_style">课表设置</string>
+    <string name="settings_timetable_style_detail">时间指示线与课程卡片样式</string>
+
+    <!-- 账号设置 -->
+    <string name="settings_section_ids">统一身份认证</string>
+    <string name="settings_ids_account">统一身份认证账号</string>
+    <string name="settings_not_logged_in">未登录</string>
+    <string name="settings_section_experiment">物理实验系统</string>
+    <string name="settings_experiment_credentials">修改物理实验账号密码</string>
+    <string name="settings_experiment_account_in_use">当前账号：%1$s</string>
+    <string name="settings_experiment_account_default">未单独设置，使用统一身份认证账号</string>
+    <string name="settings_experiment_account_unset">未设置，物理实验信息将无法获取</string>
+
+    <!-- 账号密码对话框 -->
+    <string name="settings_account_label">账号</string>
+    <string name="settings_account_hint">留空即使用统一身份认证账号</string>
+    <string name="settings_password_label">密码</string>
+    <string name="settings_blank_input">输入空白!</string>
+    <string name="settings_show_password">显示密码</string>
+    <string name="settings_hide_password">隐藏密码</string>
+    <string name="settings_cancel">取消</string>
+    <string name="settings_confirm">确定</string>
+
+    <!-- 课表设置 -->
+    <string name="settings_section_time_indicator">时间指示线</string>
+    <string name="settings_indicator_enabled">显示当前时间指示线</string>
+    <string name="settings_indicator_enabled_detail">在课表上画一条随当前时间移动的线</string>
+    <string name="settings_indicator_label">显示时间标签</string>
+    <string name="settings_indicator_label_detail">在指示线上写出当前的时间</string>
+    <string name="settings_today_highlight">高亮今日列</string>
+    <string name="settings_today_highlight_detail">为今天所在的一列着色</string>
+    <string name="settings_section_class_card">课程卡片</string>
+    <string name="settings_completed_style">已完成的课程样式</string>
+    <string name="settings_completed_style_detail">已结束的课程以半透明绘制；关闭后它与进行中的课程外观相同</string>
+
+    <!-- 实验信息 -->
+    <string name="experiment_title">实验信息</string>
+    <string name="experiment_loading">物理实验正在加载</string>
+    <string name="experiment_cache_notice">目前加载缓存状况：%1$s</string>
+    <string name="experiment_error">获取物理实验信息时发生错误：%1$s</string>
+    <string name="experiment_cache_hint_missing_password">未填写物理实验密码。</string>
+    <string name="experiment_cache_hint_login_failed">物理实验登录失败。</string>
+    <string name="experiment_cache_hint_network_failed">物理实验网络请求失败。</string>
+    <string name="experiment_cache_hint_unknown_error">在线获取物理实验失败。详细错误请查看日志。</string>
+    <string name="experiment_no_password">没有物理实验密码，请到设置中进行设置</string>
+    <string name="experiment_open_account_settings">修改物理实验账号密码</string>
+    <string name="experiment_ongoing">正在进行实验</string>
+    <string name="experiment_not_finished">未完成实验</string>
+    <string name="experiment_all_finished">所有实验全部完成</string>
+    <string name="experiment_finished">已完成实验</string>
+    <string name="experiment_none_finished">目前没有已经完成的实验</string>
+    <string name="experiment_score_hint">您可点击卡片上的成绩字段来查看原始成绩数据</string>
+    <string name="experiment_score_info">%1$s (推测)</string>
+    <string name="experiment_tap_for_score">成绩未识别出来</string>
+    <string name="experiment_your_score">您的分数：</string>
+    <string name="experiment_predict_score">推测分数：%1$s</string>
+    <string name="experiment_score_found_hint">目前识别库数据不全，请您务必核对一下。</string>
+    <string name="experiment_score_unknown_hint">您的分数不在 XDYou 分数识别库中，因此它没有被正常识别。</string>
+    <string name="experiment_teacher_not_provided">未提供</string>
+    <string name="experiment_refresh">刷新</string>
+    <string name="experiment_confirm">确定</string>
+    <string name="experiment_sitting">%1$s 星期%2$s %3$s~%4$s</string>
+
+</resources>

@@ -128,10 +128,14 @@ private fun HomeTile(
         )
 
         HomeTileId.Grade, HomeTileId.Exam, HomeTileId.EmptyRoom, HomeTileId.Attendance,
-        HomeTileId.Network, HomeTileId.Science, HomeTileId.Sport,
+        HomeTileId.Network, HomeTileId.Sport,
             -> ShortcutSpecs.getValue(id).let { StatTile(icon = it.symbol, label = it.label) }
 
         HomeTileId.Water -> ShortcutSpecs.getValue(id).let { StatTile(icon = it.symbol, label = it.label) }
+
+        HomeTileId.Science -> ShortcutSpecs.getValue(id).let {
+            StatTile(icon = it.symbol, label = it.label, onClick = { actions.openExperiments() })
+        }
 
         HomeTileId.WaterFee -> ShortcutSpecs.getValue(id).let {
             StatTile(icon = it.symbol, label = it.label, onClick = { actions.openWaterFee() })

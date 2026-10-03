@@ -26,6 +26,17 @@ interface SecureStore {
 object SecureKeys {
     const val IDS_ACCOUNT = "ids.account"
     const val IDS_PASSWORD = "ids.password"
+
+    /**
+     * The physics experiment system's own credentials.
+     *
+     * A separate account from [IDS_ACCOUNT] because the lab site is not behind IDS: it has a login form
+     * of its own, and the student number that works there happens to also be the IDS one. The original
+     * sent the IDS account for every experiment login and never stored one of its own; the account is
+     * stored here so it can be changed without changing the account this app signs into.
+     */
+    const val EXPERIMENT_ACCOUNT = "experiment.account"
+    const val EXPERIMENT_PASSWORD = "experiment.password"
 }
 
 /**

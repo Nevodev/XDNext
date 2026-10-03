@@ -31,6 +31,9 @@ class AppDestinationTest {
             AppDestination.SchoolCard,
             AppDestination.NotArrangedClasses,
             AppDestination.ClassChanges,
+            AppDestination.Experiments,
+            AppDestination.AccountSettings,
+            AppDestination.TimetableStyle,
         )
         val navigator = Navigator<AppDestination>(AppDestination.Home)
         pages.drop(1).forEach(navigator::open)

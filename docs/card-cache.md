@@ -91,6 +91,10 @@ class CardRefresher(
 调用点是 `FocusScreen` 里的 `LaunchedEffect(refresher) { refresher.loadOnce() }`，新卡片同时要在
 `HomeScreen` 构造 `CardRefresher` 的地方补上依赖。
 
+物理实验（`data/experiment`）也在这个列表里，但它**排在最后**：它画在课表网格和它自己的页面上，
+第一屏不等它；而它是这里最慢的一个——要登录第二个系统，再为每门课读一页拿教师名字。没有存密码时
+它立刻失败，这正是新装应用的状态。
+
 ### 为什么"只刷一次"的标记必须放在 CardRefresher 里
 
 这一条踩过坑，务必照做：**聚焦页在切走 tab 时会被卸载**——`CrossfadeNavContainer` 的
@@ -147,6 +151,7 @@ schoolCard)` 构造一次，并间接持有 app 级的 repository）。所以"�
 | 校园卡 | `SchoolCard.json` | `knownDate`：当日支出/收入/笔数描述的那一天 | `data/schoolcard/SchoolCardRepository.kt` |
 | 校园卡页面（区间流水） | `SchoolCardTradeList.json` | 区间本身：只在存下的区间**包含**要问的区间时才用 | `data/schoolcard/SchoolCardFlowsRepository.kt` |
 | 课表 | `ClassTable.json` | `semesterCode`：这份课表属于哪个学期 | `data/timetable/TimetableRepository.kt` |
+| 物理实验 | `PhysicsExperiment.json` | 无有效期字段；但它属于**一份账号**，所以换账号时 `ExperimentRepository.onCredentialsChanged()` 先删文件再重查 | `data/experiment/ExperimentRepository.kt` |
 
 课表的缓存文件就是原始项目的那个名字、那份裸 `ClassTableData` JSON（它自带的桌面小组件也读这个文件），
 所以两边抓下来的文件可以直接对拍。它的「时效字段」不像校园卡那样在读取时校验：学期换掉之后，只有一次

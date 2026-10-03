@@ -9,6 +9,12 @@ package com.nevoit.xdnext.core.image
  *
  * Pixels are packed non-premultiplied ARGB, which is what both `Bitmap.getPixels` and
  * `ImageBitmap.readPixels` produce.
+ *
+ * The three channel readers below exist for the *other* consumer of decoded pixels: the physics
+ * experiment report system shows each mark as an image, and
+ * [com.nevoit.xdnext.data.experiment.ExperimentScoreRecognition] identifies that image by hashing the
+ * colour of its pixels. A type that hands out pixels is the same thing for both, and a second decoder
+ * would be a second opinion about what a pixel is.
  */
 class CaptchaImage(
     val width: Int,
@@ -24,6 +30,15 @@ class CaptchaImage(
 
     /** 0 (transparent) to 255 (opaque). The matcher finds the piece outline from this. */
     fun alpha(x: Int, y: Int): Int = (pixels[y * width + x] ushr 24) and 0xFF
+
+    /** 0..255, not premultiplied by [alpha]. */
+    fun red(x: Int, y: Int): Int = (pixels[y * width + x] ushr 16) and 0xFF
+
+    /** 0..255, not premultiplied by [alpha]. */
+    fun green(x: Int, y: Int): Int = (pixels[y * width + x] ushr 8) and 0xFF
+
+    /** 0..255, not premultiplied by [alpha]. */
+    fun blue(x: Int, y: Int): Int = pixels[y * width + x] and 0xFF
 
     /**
      * Perceptual luminance in 0..255.

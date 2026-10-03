@@ -48,4 +48,16 @@ sealed interface AppDestination {
     /** 课程调整 — the registrar's moves, cancellations and make-up sessions. */
     @Serializable
     data object ClassChanges : AppDestination
+
+    /** 实验信息 — the physics experiment bookings, with the marks the lab published. */
+    @Serializable
+    data object Experiments : AppDestination
+
+    /** 账号设置 — the accounts this app signs into, and the lab site's own credentials. */
+    @Serializable
+    data object AccountSettings : AppDestination
+
+    /** 课表设置 — how the grid draws itself: the current-time line and the finished-class styling. */
+    @Serializable
+    data object TimetableStyle : AppDestination
 }

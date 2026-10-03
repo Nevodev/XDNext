@@ -1,5 +1,6 @@
 package com.nevoit.xdnext.data.timetable
 
+import com.nevoit.xdnext.data.experiment.ExperimentEntry
 import kotlinx.datetime.LocalTime
 
 /**
@@ -9,11 +10,11 @@ import kotlinx.datetime.LocalTime
  * — two courses that clash, or a course and an exam in the same slot — into a single rectangle with a
  * marker and a count.
  *
- * The sealed interface is the seam that matters most for what comes next: an exam, a physics
- * experiment and a locally added course are all things the original drew in this same grid and
- * described in this same detail sheet. Each becomes a variant here, and every `when` over it — the
- * sheet, the calendar export — fails to compile until it is handled, which is cheaper than noticing
- * on a device that an exam's sheet is blank.
+ * The sealed interface is the seam that matters most for what comes next: an exam, a physics experiment
+ * and a locally added course are all things the original drew in this same grid and described in this
+ * same detail sheet. Each becomes a variant here, and every `when` over it — the sheet, the calendar
+ * export — fails to compile until it is handled, which is cheaper than noticing on a device that an
+ * exam's sheet is blank.
  */
 sealed interface ClassBlockEntry {
 
@@ -21,6 +22,21 @@ sealed interface ClassBlockEntry {
     data class Course(
         val detail: ClassDetail,
         val arrangement: TimeArrangement,
+    ) : ClassBlockEntry
+
+    /**
+     * A physics experiment sitting, with the booking that placed it.
+     *
+     * The whole booking travels rather than the fields the card happens to draw today, because the card
+     * is not the only reader: a detail sheet has to list the room, the teacher, the reference material
+     * and the mark, and every one of those lives on the booking rather than on the rectangle.
+     *
+     * That the timetable's own model names a feature module's type is deliberate: the grid is the thing
+     * extra sources are projected *onto*, [TimetableOverlay] is the seam that takes them, and a variant
+     * here is what makes the compiler say so when a source is added.
+     */
+    data class Experiment(
+        val entry: ExperimentEntry,
     ) : ClassBlockEntry
 }
 
@@ -83,8 +99,8 @@ data class ClassBlock(
          *
          * Exams and experiments are the original's two: they are announced as "09:00 to 11:00" and have
          * no period numbers at all, so they are projected through [TimetableLayout.blockOf] instead.
-         * [entry] is what the detail sheet will describe; it is a [ClassBlockEntry.Course] today only
-         * because no other variant exists yet.
+         * [entry] is what the detail sheet will describe — a [ClassBlockEntry.Experiment] for a physics
+         * experiment sitting, and a [ClassBlockEntry.Course] for the exam variant when it arrives.
          */
         fun ofTimed(
             entry: ClassBlockEntry,

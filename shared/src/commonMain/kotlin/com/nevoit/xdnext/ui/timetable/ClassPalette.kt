@@ -40,9 +40,10 @@ import com.nevoit.material.theme.tokens.Yellow500
  *  - [showTimeLabel] and [showTodayColumnHighlight] are **true**, so the indicator's clock face and
  *    the tinted column exist out of the box.
  *
- * The preference keys behind them (`currentTimeIndicatorEnabled`, `classStyleCompletedEnabled`, …)
- * arrive with the settings page that owns them; nothing writes them yet, so reading them here would be
- * reading defaults through a filesystem. This is the parameter that page will supply.
+ * The preference keys behind them are the original's own, and `ui.timetable.TimetableAppearanceStore`
+ * reads and writes them: the settings page (`ui.settings.TimetableStyleScreen`) is what a user changes,
+ * and this value is what the drawing code is handed. The original read its two config statics out of the
+ * preference file on every access; keeping the value separate is what lets the grid be drawn in a test.
  *
  * The one thing that is *not* the original's is what a finished class is made of. The original took a
  * saturation and a lightness factor to each of the card's three tones in HSL; with the card's colours

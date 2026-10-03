@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The physics experiment system is served over plain HTTP, and only that system is.
+
+  `wlsy.xidian.edu.cn` — the lab site (`PhyEws`) and its report system (`wgyreport`) — has no TLS
+  listener at all, which is not an oversight here: the original client used `http://` for every request
+  to it, and the two systems' own pages are written against that origin. Android blocks cleartext by
+  default from API 28 on, so without this the module fails before its first request with
+  `CLEARTEXT communication to wlsy.xidian.edu.cn not permitted by network security policy` — the login
+  never reaches the server, and the page reports a network failure that names nothing actionable.
+
+  Deliberately **not** `android:usesCleartextTraffic="true"`: every other host this app talks to is HTTPS
+  (IDS, eHall, the energy system, the campus card), and a blanket permission would silently permit plain
+  HTTP to all of them if one ever changed its URL. The exemption is one host and its subdomains.
+
+  What this costs is worth stating: the experiment account and password travel in the clear over the
+  campus network, because that is the only way this system speaks. The password is still encrypted at
+  rest (see `SecureStore`), and the original sent the same two fields over the same cleartext origin.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">wlsy.xidian.edu.cn</domain>
+    </domain-config>
+</network-security-config>

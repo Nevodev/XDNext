@@ -76,14 +76,37 @@ courses, one schedule adjustment and 19 teaching weeks, and the page drew that w
 step with the strip, and dropped the current-time line on a week that does not contain today. See
 [The timetable](#the-timetable).
 
+**Slice 6 — the physics experiment system, the grid it draws on, and the settings pages.** 实验信息 is on
+screen and reads the lab site, `wlsy.xidian.edu.cn`, which is not behind IDS: it has a login form of its
+own, its pages are GB18030, and the marks it publishes are **pictures** rather than numbers. The module
+therefore does what the original did — logs in with a student number and a password of its own, reads the
+booking table, reads one plan-grid page per course for the teachers, walks the report system's
+five-event handshake for the marks, and recognises each mark by hashing its pixels against a table
+generated from the lab's own images. The page is opened from the campus page's 实验信息 tile, which is
+where the original opened it from; the bookings *also* arrive on the timetable through `TimetableOverlay`,
+so a lab sits in the same 61-block coordinate system as a lecture and merges with one that clashes. See
+[The physics experiment system](#the-physics-experiment-system).
+
+The settings tab became a list of **categories** (`ui.settings`) rather than one long scroll: 账号设置
+holds the account this app signs in with and the lab site's own, and 课表设置 holds the four switches the
+grid's appearance is made of — the preferences the timetable's drawing code had been reading defaults for
+since Slice 5. Both are pages pushed over the shell by the navigator, not dialogs, and they draw the same
+floating title bar over a blurred copy of the page that 电量 and 校园卡 do.
+
+Their text — and the experiment page's — lives in `composeResources/values/strings.xml` rather than in a
+Kotlin object of `const val`s. See [Strings](#strings).
+
 Not yet implemented, in rough order of what comes next:
 
-1. the **home shell's data** and the settings behind those rows — the timetable tile still draws a
-   placeholder number rather than today's arrangements.
-2. the timetable's own remaining four sources and three menu entries: exams, physics experiments,
-   other experiments and locally added courses are all projected onto the same grid by the original,
-   and 添加课程信息, 生成日历文件 and 导出到系统日历 are the entries that go with them. The seams for
-   all of it are in place — see [The timetable](#the-timetable).
+1. the **home shell's own data**: the timetable tile still draws a placeholder number rather than today's
+   arrangements, and the settings categories stop at the two that have something behind them — the
+   original's notification, cache and about pages have no module to configure yet.
+2. the timetable's remaining three sources and three menu entries: exams, other experiments and locally
+   added courses are all projected onto the same grid by the original, and 添加课程信息, 生成日历文件 and
+   导出到系统日历 are the entries that go with them. The seams for all of it are in place — see
+   [The timetable](#the-timetable); the physics experiment system is the first source to arrive through
+   `TimetableOverlay`, and the other experiment system is a second implementation of
+   `ExperimentDataSource` rather than a new grid.
 3. the electricity page itself: the two charts, the cache notice and the reminder threshold dialog.
 4. the postgraduate (yjspt) branch of every academic module — the login flow already probes for it, and
    the timetable is the first module that has to answer it.
@@ -108,6 +131,7 @@ Inside `shared/src/commonMain/kotlin/com/nevoit/xdnext`:
 | `core.platform` | The entire platform surface: clock, support directory, HTTP engine. |
 | `core.store` | `SecureStore` (secrets) and `SettingsStore` (preferences). |
 | `data.energy` | The energy management system: models, the signed/encrypted protocol, the file cache, the session, the state holder. |
+| `data.experiment` | The physics experiment system: the lab site's WebForms login and booking page, the per-course teacher lookup, the report system's score images and their recognition, `PhysicsExperiment.json`, the session, the state holder, and the projection of a booking onto the week grid. |
 | `data.fetch` | `FetchResult` — a value that is either fresh or served from the cache, with the reason. |
 | `data.ids` | The IDS/CAS protocol: endpoints, both AES schemes, page parsing, HTTP calls, captcha signing, the second-factor client, models. |
 | `data.net` | Ktor client factory, persistent cookie store, URL resolution. |
@@ -116,9 +140,11 @@ Inside `shared/src/commonMain/kotlin/com/nevoit/xdnext`:
 | `data.timetable` | The registrar's timetable: the eHall endpoints, the row parser and the schedule-adjustment merge, the 61-block grid's arithmetic, the `ClassTable.json` cache, the session and the state holder. |
 | `di` | Koin modules. |
 | `ui.home` | The shell: the bottom bar, the three pages, and the home-screen grid packer. |
+| `ui.experiment` | 实验信息 — the three lists a booking's sittings fall into, the mark's picture, the sentences around them, and the overlay that hands the bookings to the timetable's grid. |
 | `ui.icon` | Material Symbols as an icon font: `ProvideMaterialSymbols` and `SymbolIcon`. |
 | `ui.login` | Login screen, captcha dialog, second-factor dialog, and their view model. |
 | `ui.schoolcard` | 校园卡 — the range picker, the flow table and the page's summary, plus the wording its two headings are built from. |
+| `ui.settings` | 设置 — the tab's category entries, and the two pages behind them: 账号设置 (the IDS account and the lab site's credentials) and 课表设置 (the four switches the grid's appearance is made of). |
 | `ui.timetable` | 我的日程表 — the week strip and its 5×5 overview, the 61-block grid with its period column, date row and class cards, the current-time line, the class palette, and the two list pages. |
 | `ui` | `AppNavHost` and `AppDestination`: which pages exist and what opens each one. |
 
@@ -164,6 +190,33 @@ slider captcha's heading — a face chosen for the card numbers should not silen
 dialog. Google Sans Flex is under the SIL Open Font License 1.1, and the notice travels inside the file
 (`name` IDs 13/14), which is what that licence asks for. The family has no CJK coverage, so the Chinese
 in a card value falls through to the system face and only the digits and Latin change.
+
+## Strings
+
+User-visible text is a **resource**, not a Kotlin `const`: `composeResources/values/strings.xml`, read
+through `stringResource(Res.string.…)`. That is this project's `strings.xml` — Compose Multiplatform's
+resource directory, the same file shape and the same `%1$s` placeholders — and it is where every new
+sentence goes.
+
+Two rules come with it, and both are about where the text *isn't*:
+
+- **a screen has no sentences in it.** It reads a resource at the point it draws, so the wording of a
+  page is one file to look at and one file to translate. Parameterised strings take their arguments
+  rather than being concatenated, so a translation can move a value within its sentence;
+- **`data` carries no text at all.** A cache hint is an enum whose `key` travels through
+  `FetchResult.hintKey`; the sentence for it is mapped from that value where it is drawn
+  (`ExperimentCacheHint.messageRes`). A failure with nothing to show is classified by the same function
+  the cache notice uses, so the page prints a sentence rather than an exception's `toString()`, and a
+  booking whose teacher the plan grid did not name carries `null` rather than the word 未提供.
+
+What this costs is one import per string (they are extension properties on `Res.string`, so `Res` alone
+does not bring them into scope), which is why a page that shows twenty strings opens with twenty import
+lines. That is the price of not having a second string table.
+
+The modules from the earlier slices — `ui.timetable.TimetableStrings`, `ui.home`'s tile labels,
+`EnergyCacheHint.message` and `TimetableCacheHint.message`, and the sentences inside
+`ui.login` and `ui.schoolcard` — still carry their text in Kotlin. They are the older arrangement; moving
+them is mechanical, and it is the follow-up rather than a second convention to add to.
 
 ## Theming
 
@@ -458,8 +511,10 @@ accent and costs thirty-two schemes, sixteen colours in two themes; nothing is c
 what makes it follow the wallpaper, and generation happens off the main thread, after the first
 composition has been committed (see [Startup](#startup)). The one thing the palette no longer does is adjust a colour per
 class: a finished class is now the same two colours at half opacity. That styling is **off** by default,
-so a finished class looks exactly like a running one until the setting is turned on; the preference keys
-behind it and the current-time line's own three arrive with the settings page that owns them.
+so a finished class looks exactly like a running one until the setting is turned on; the four switches
+behind it and the current-time line's own three are on 课表设置 (`ui.settings.TimetableStyleScreen`), which
+writes them through `ui.timetable.TimetableAppearanceStore` — the store exists so the change reaches the
+grid that is already composed *underneath* the settings page, rather than the next time it is opened.
 
 Nothing in the timetable's request shape is measured the way the energy protocol's was: there is no
 recorded wire capture for these five calls, so the headers, the form-encoded bodies and the row field
@@ -473,10 +528,99 @@ test could see and every screenshot could.
 One asset is deliberately not carried over: the original's empty-week illustration. Its own
 `assets/README.MD` puts it outside free software, and the page draws the sentence without it.
 
+## The physics experiment system
+
+`data.experiment` is the fourth backend, and the first that is **not** behind IDS. The physics lab is a
+WebForms application of its own at `wlsy.xidian.edu.cn`, and the student signs into it with their student
+number and a *separate* password — which is why this module reads neither the IDS session nor the IDS
+password. What the settings page stores is a pair of credentials, and the account defaults to the one
+this app signed in with: the same identity, in a system that has never heard of IDS.
+
+The module has two readers, and they are one value: `ui.experiment.ExperimentScreen`, reached from the
+campus page's 实验信息 tile, and `ui.experiment.rememberExperimentOverlays`, which hands the bookings to
+the timetable's grid as an overlay so a lab is placed by the same arithmetic as a lecture. Both read
+`ExperimentRepository`; neither owns a fetch.
+
+A refresh is five steps, each depending on what the last one answered:
+
+1. `POST PhyEws/default.aspx`, the login postback. Its view-state values are the original's own literals
+   — they are stable for this application and a request that looked them up again would be a *different*
+   request from the one that has been logging in successfully for years. A successful login answers
+   **302**, so the status is the verdict here, and a refusal's own sentence is in the page it sends back
+   (`login1_Label1`, with its `<font>`/`<br>` markup turned into a sentence);
+2. the `Cookie` header, rebuilt from that response. The original dropped the `HttpOnly` cookies and
+   **substituted a fixed value for the student-name cookie** ("This guy find out the secret"), and both
+   are reproduced as they stand: the site checks that the cookie is present, and the real value is the
+   student's name in Chinese, which a hand-built header would have to encode;
+3. `GET PhyEws/student/select.aspx` — the booking table. Its columns are positional in the original's own
+   order (1 the course, 3 the time, 4 the day, 5 the room, 9 the reference), and every one of them is read
+   from a `<span>` inside the cell. The page writes the day as **`9/15/2026`** — month, day, year, which
+   the original's `DateTime(dateNums[2], dateNums[0], dateNums[1])` says too — and the time column as
+   `星期三下午15:55-18:10` or `星期四晚上18:30-20:45`, whose weekday is what confirms the date's order: the
+   first reading of it here was the other way round, and every booking vanished from the grid;
+4. the **teachers**, which are not on that page at all. `PhyEws/student/course.aspx` carries a plan grid
+   for *one course at a time*, and switching it is a postback of the page's own hidden fields — so a
+   refresh reads the grid once and posts it back once per course that has a booking;
+5. the **marks**, from the report system on the same host. This is not a page: `wgyreport.dll` is a "UNI
+   GUI" application whose state is built by replaying input events, so a session has to send a window-size
+   report, a mouse move, an activate, a resize and a click carrying the credentials before the same
+   endpoint will answer a data query. The marks themselves are *pictures* — `9.5`, `已上传`, `未上传` —
+   and are identified by hashing the top-left 50 × 20 pixels of each image (FNV-1a over the opaque
+   pixels' RGB) and looking the hash up in a table generated from the lab's own images, which is the
+   original's `generated/score_hashes.g.dart`, copied value for value. A mark the table does not know is
+   reported as unrecognised rather than guessed at, and the page offers to show the picture it came from.
+
+The teachers are the one thing the original did differently: it read the plan grid **once per booking**
+inside a pool of three, which is the same grid three times over. Reading it once per refresh and posting
+it from course to course is the same answers with one page read instead of one per booking.
+
+Where the module is deliberately **not** the original's:
+
+- **a booking whose teacher cannot be found is kept**, with 未提供 as its teacher. The original threw, and
+  because the lookups ran inside one `Future.wait`, a single missing name lost every booking in the list.
+  The same goes for a booking whose course is not in the plan grid's option list: the original asserted
+  non-null there and crashed;
+- **the three sections are classified against the clock.** The original compared against *now plus one
+  day*, which filed a sitting that ends this evening as 已完成 from midnight onwards — a booking the user
+  is about to walk into, drawn under a heading that says it is over;
+- **one unreadable row is one row lost.** The original parsed a row's date with `int.parse` and indexed
+  its cells directly, so a row the site spelled differently threw and took the whole list with it;
+- **the score-hash window is clamped to the image.** The original read 50 × 20 pixels unconditionally,
+  which throws on an image that is smaller — the failure being a page with no list at all, over a mark.
+
+What a device has now shown, and what it has not:
+
+- **measured**: the host is HTTP-only — Android's cleartext policy refuses it, which is why the module
+  ships a one-host exemption in `network_security_config.xml` rather than a blanket
+  `usesCleartextTraffic`; the login postback is accepted (the booking page comes back); the course-name
+  column parses; the date column is `M/d/yyyy`, cross-checked against the weekday the page prints beside
+  it; and the time column is the two shapes above, which the afternoon/evening marker test separates
+  correctly;
+- **unmeasured**: the plan grid behind the teachers (its `TimeN_*`/`Teacher_*` spans were never seen — the
+  pairing and the selector are a reading of the original), the report system's five-event handshake, and
+  the score-image table's coverage of the pictures the lab serves today.
+
+Everything downstream of the parse is verified by tests rather than by a device: the sitting arithmetic,
+the pixel hash, the grouping, the cache, and the grid's own placement — and the failure modes are
+contained by construction, because a booking that cannot be read is one booking logged and dropped
+rather than a list, and a mark that cannot be recognised is reported as unrecognised rather than shown.
+
 ## Deliberate deviations from the original
 
 These are choices, not oversights. Each one is something the original either could not do or got
 wrong in a way that is worth not reproducing.
+
+- **A physics experiment booking is never lost to a missing detail.** The original threw when a booking's
+  teacher was not in the plan grid, when its course was not in the grid's option list at all, and when a
+  row's date did not parse — and every one of those threw away the *whole* list, because the lookups ran
+  inside a single `Future.wait`. Here a missing teacher reads 未提供 and an unreadable row is one row
+  lost; see [The physics experiment system](#the-physics-experiment-system).
+
+- **A mark is never invented.** The lab publishes scores as pictures, and the original identified them by
+  hashing pixels against a table generated from the lab's own images. That table is a snapshot — a mark
+  the lab re-renders hashes to nothing here — so an unrecognised picture is reported as unrecognised
+  rather than shown as a score, and the page offers to show the picture itself, which is the only thing
+  that makes the answer actionable.
 
 - **Material 3 is not a dependency.** The screens are built on `com.nevoit.material` instead — see
   [Theming](#theming). Keeping the official Material 3 would have meant two material design systems in

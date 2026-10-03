@@ -22,4 +22,5 @@ class TileActions(
     val openEnergy: () -> Unit,
     val openWaterFee: () -> Unit,
     val openSchoolCard: () -> Unit,
+    val openExperiments: () -> Unit,
 )

@@ -1,6 +1,7 @@
 package com.nevoit.xdnext.ui.home
 
 import com.nevoit.xdnext.data.energy.EnergyRepository
+import com.nevoit.xdnext.data.experiment.ExperimentRepository
 import com.nevoit.xdnext.data.schoolcard.SchoolCardRepository
 import com.nevoit.xdnext.data.timetable.TimetableRepository
 
@@ -41,6 +42,7 @@ class CardRefresher(
     private val energy: EnergyRepository,
     private val schoolCard: SchoolCardRepository,
     private val timetable: TimetableRepository,
+    private val experiments: ExperimentRepository,
 ) {
 
     /** Whether this process has already asked for every module. */
@@ -81,5 +83,12 @@ class CardRefresher(
             energy.refreshElectricityInfo()
             schoolCard.refreshSchoolCard()
         }
+
+        // Last in both orders, and for a reason of its own: the experiment list is drawn on the
+        // timetable's grid and on a page of its own, so nothing on the first screen waits for it — while
+        // it is the slowest module here, because it logs into a second system and then reads one page
+        // per course for the teachers. It also fails *immediately* when no experiment password is
+        // stored, which is the state a new install is in.
+        experiments.refresh()
     }
 }

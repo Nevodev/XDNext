@@ -8,6 +8,7 @@ import com.nevoit.xdnext.core.startup.AppWarmUp
 import com.nevoit.xdnext.core.startup.StartupClock
 import com.nevoit.xdnext.di.androidModule
 import com.nevoit.xdnext.di.energyModule
+import com.nevoit.xdnext.di.experimentModule
 import com.nevoit.xdnext.di.schoolCardModule
 import com.nevoit.xdnext.di.sharedModule
 import com.nevoit.xdnext.di.timetableModule
@@ -46,7 +47,14 @@ class XdNextApplication : Application() {
 
         startKoin {
             androidContext(this@XdNextApplication)
-            modules(sharedModule, energyModule, schoolCardModule, timetableModule, androidModule)
+            modules(
+                sharedModule,
+                energyModule,
+                schoolCardModule,
+                timetableModule,
+                experimentModule,
+                androidModule,
+            )
         }.koin.get<AppWarmUp>().start()
     }
 }

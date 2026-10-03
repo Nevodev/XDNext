@@ -8,6 +8,7 @@ import com.nevoit.xdnext.data.timetable.TimetableCache
 import com.nevoit.xdnext.data.timetable.TimetableDataSource
 import com.nevoit.xdnext.data.timetable.TimetableRepository
 import com.nevoit.xdnext.data.timetable.TimetableSession
+import com.nevoit.xdnext.ui.timetable.TimetableAppearanceStore
 import io.ktor.client.HttpClient
 import okio.FileSystem
 import okio.Path.Companion.toPath
@@ -44,6 +45,10 @@ val timetableModule = module {
     }
 
     single { TimetableApi(client = get<HttpClient>(), json = get()) }
+
+    // The grid's appearance is a preference the settings page writes and the timetable page draws, and
+    // it is one value for the whole app: two instances would be two answers to "how is the grid drawn".
+    single { TimetableAppearanceStore(settings = get()) }
 
     single<TimetableDataSource> {
         TimetableSession(

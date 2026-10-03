@@ -57,9 +57,10 @@ fun TimetableScreen(
 ) {
     val repository: TimetableRepository = koinInject()
     val state by repository.state.collectAsState()
+    val appearanceStore: TimetableAppearanceStore = koinInject()
+    val appearance by appearanceStore.appearance.collectAsState()
     val scope = rememberCoroutineScope()
     val now = rememberTimetableNow()
-    val appearance = remember { TimetableAppearance() }
 
     var showErrorSummary by remember { mutableStateOf(false) }
     var showRefreshConfirm by remember { mutableStateOf(false) }

@@ -79,4 +79,22 @@ object SettingsKeys {
      * is what lets a user keep looking at a future semester they chose.
      */
     const val ACADEMIC_SEMESTER_CODE = "academic.semesterCode"
+
+    /**
+     * How the timetable grid draws itself: its current-time line and its finished-class styling.
+     *
+     * The four keys are the original's own (`Preference.currentTimeIndicatorEnabled`, …), which is why
+     * they are named in its camelCase rather than this app's dotted convention: they are the names the
+     * settings page it shipped wrote, and keeping them is what makes the mapping between the two apps'
+     * settings a one-to-one reading rather than a translation.
+     *
+     * The original's *numeric* keys beside them — the HSL factors of `classStyleActive…` and
+     * `classStyleCompleted…` — have no counterpart here, because the grid's colours are generated rather
+     * than hand-picked: there is no saturation to nudge when the tone comes from the system accent. See
+     * `TimetableAppearance`.
+     */
+    const val TIMETABLE_TIME_INDICATOR = "currentTimeIndicatorEnabled"
+    const val TIMETABLE_TIME_INDICATOR_LABEL = "currentTimeIndicatorShowTimeLabel"
+    const val TIMETABLE_TODAY_HIGHLIGHT = "currentTimeIndicatorShowTodayColumnHighlight"
+    const val TIMETABLE_COMPLETED_CLASS_STYLE = "classStyleCompletedEnabled"
 }

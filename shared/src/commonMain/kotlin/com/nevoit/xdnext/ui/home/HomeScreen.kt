@@ -27,8 +27,10 @@ import com.nevoit.material.core.component.Text
 import com.nevoit.material.navigation.CrossfadeNavContainer
 import com.nevoit.material.theme.MaterialTheme
 import com.nevoit.xdnext.data.energy.EnergyRepository
+import com.nevoit.xdnext.data.experiment.ExperimentRepository
 import com.nevoit.xdnext.data.schoolcard.SchoolCardRepository
 import com.nevoit.xdnext.data.timetable.TimetableRepository
+import com.nevoit.xdnext.ui.settings.SettingsScreen
 import com.nevoit.xdnext.ui.symbols.Symbol
 import com.nevoit.xdnext.ui.symbols.SymbolIcon
 import org.koin.compose.koinInject
@@ -49,6 +51,9 @@ fun HomeScreen(
     onOpenEnergy: () -> Unit,
     onOpenWaterFee: () -> Unit,
     onOpenSchoolCard: () -> Unit,
+    onOpenAccountSettings: () -> Unit,
+    onOpenTimetableStyle: () -> Unit,
+    onOpenExperiments: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var tab by rememberSaveable { mutableStateOf(HomeTab.Focus) }
@@ -56,16 +61,24 @@ fun HomeScreen(
     val energy: EnergyRepository = koinInject()
     val schoolCard: SchoolCardRepository = koinInject()
     val timetable: TimetableRepository = koinInject()
-    val cardRefresher = remember(energy, schoolCard, timetable) {
-        CardRefresher(energy, schoolCard, timetable)
+    val experiments: ExperimentRepository = koinInject()
+    val cardRefresher = remember(energy, schoolCard, timetable, experiments) {
+        CardRefresher(energy, schoolCard, timetable, experiments)
     }
 
-    val tileActions = remember(onOpenTimetable, onOpenEnergy, onOpenWaterFee, onOpenSchoolCard) {
+    val tileActions = remember(
+        onOpenTimetable,
+        onOpenEnergy,
+        onOpenWaterFee,
+        onOpenSchoolCard,
+        onOpenExperiments,
+    ) {
         TileActions(
             openTimetable = onOpenTimetable,
             openEnergy = onOpenEnergy,
             openWaterFee = onOpenWaterFee,
             openSchoolCard = onOpenSchoolCard,
+            openExperiments = onOpenExperiments,
         )
     }
 
@@ -100,7 +113,10 @@ fun HomeScreen(
                     )
 
                     HomeTab.Toolbox -> ToolboxScreen()
-                    HomeTab.Settings -> SettingsScreen()
+                    HomeTab.Settings -> SettingsScreen(
+                        onOpenAccountSettings = onOpenAccountSettings,
+                        onOpenTimetableStyle = onOpenTimetableStyle,
+                    )
                 }
             }
 

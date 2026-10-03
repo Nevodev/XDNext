@@ -8,6 +8,9 @@ import com.nevoit.xdnext.data.energy.EnergyInfo
 import com.nevoit.xdnext.data.energy.EnergyRepository
 import com.nevoit.xdnext.data.energy.MeterInfo
 import com.nevoit.xdnext.data.fetch.FetchResult
+import com.nevoit.xdnext.data.experiment.ExperimentDataSource
+import com.nevoit.xdnext.data.experiment.ExperimentEntry
+import com.nevoit.xdnext.data.experiment.ExperimentRepository
 import com.nevoit.xdnext.data.schoolcard.SchoolCardDataSource
 import com.nevoit.xdnext.data.schoolcard.SchoolCardRange
 import com.nevoit.xdnext.data.schoolcard.SchoolCardRepository
@@ -47,6 +50,7 @@ class CardRefresherTest {
             EnergyRepository(energy, settings()),
             SchoolCardRepository(schoolCard),
             TimetableRepository(timetable),
+            ExperimentRepository(FakeExperimentSource()),
         )
 
         refresher.loadOnce()
@@ -67,10 +71,12 @@ class CardRefresherTest {
         val energy = FakeEnergySource()
         val schoolCard = FakeSchoolCardSource()
         val timetable = FakeTimetableSource()
+        val experiments = FakeExperimentSource()
         val refresher = CardRefresher(
             EnergyRepository(energy, settings()),
             SchoolCardRepository(schoolCard),
             TimetableRepository(timetable),
+            ExperimentRepository(experiments),
         )
 
         refresher.loadOnce()
@@ -81,9 +87,9 @@ class CardRefresherTest {
         refresher.loadOnce()
 
         assertEquals(
-            3,
-            energy.fetches + schoolCard.fetches + timetable.fetches,
-            "Three modules, one fetch each — not six."
+            4,
+            energy.fetches + schoolCard.fetches + timetable.fetches + experiments.fetches,
+            "Four modules, one fetch each — not eight."
         )
     }
 
@@ -95,6 +101,7 @@ class CardRefresherTest {
             EnergyRepository(FakeEnergySource(), settings()),
             SchoolCardRepository(FakeSchoolCardSource()),
             TimetableRepository(FakeTimetableSource()),
+            ExperimentRepository(FakeExperimentSource()),
         )
 
         assertFalse(refresher.hasLoaded)
@@ -109,11 +116,12 @@ class CardRefresherTest {
             EnergyRepository(FakeEnergySource(order), settings()),
             SchoolCardRepository(FakeSchoolCardSource(order)),
             TimetableRepository(FakeTimetableSource(order)),
+            ExperimentRepository(FakeExperimentSource(order)),
         )
 
         refresher.loadOnce()
 
-        assertEquals(listOf(TIMETABLE, ENERGY, SCHOOL_CARD), order)
+        assertEquals(listOf(TIMETABLE, ENERGY, SCHOOL_CARD, EXPERIMENTS), order)
     }
 
     @Test
@@ -125,11 +133,12 @@ class CardRefresherTest {
             EnergyRepository(FakeEnergySource(order), settings()),
             SchoolCardRepository(FakeSchoolCardSource(order)),
             TimetableRepository(FakeTimetableSource(order, cached = true)),
+            ExperimentRepository(FakeExperimentSource(order)),
         )
 
         refresher.loadOnce()
 
-        assertEquals(listOf(ENERGY, SCHOOL_CARD, TIMETABLE), order)
+        assertEquals(listOf(ENERGY, SCHOOL_CARD, TIMETABLE, EXPERIMENTS), order)
     }
 
     // --- helpers --------------------------------------------------------------------------------
@@ -231,11 +240,37 @@ class CardRefresherTest {
             )
         }
     }
+
+    /**
+     * The experiment module's source, which the warm-up asks for last.
+     *
+     * Its cached branch is deliberately absent rather than parametrised: nothing in the warm-up reads the
+     * experiment cache, and a fixture that could answer from one would be testing a branch no caller has.
+     */
+    private class FakeExperimentSource(
+        private val order: MutableList<String> = mutableListOf(),
+    ) : ExperimentDataSource {
+        var fetches = 0
+
+        override fun getCachedExperiments(): FetchResult<List<ExperimentEntry>>? = null
+
+        override suspend fun getExperiments(): FetchResult<List<ExperimentEntry>> {
+            fetches++
+            order += EXPERIMENTS
+            return FetchResult.fresh(fetchTime = Instant.fromEpochMilliseconds(1), data = emptyList())
+        }
+
+        override suspend fun getScoreImage(url: String): ByteArray =
+            throw UnsupportedOperationException("the warm-up does not read score images")
+
+        override fun invalidateCache() = Unit
+    }
 }
 
 private const val ENERGY = "energy"
 private const val SCHOOL_CARD = "schoolCard"
 private const val TIMETABLE = "timetable"
+private const val EXPERIMENTS = "experiments"
 
 private fun classTable() = ClassTableData(
     semesterCode = "2025-2026-1",
